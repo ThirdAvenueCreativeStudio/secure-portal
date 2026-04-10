@@ -1,0 +1,14 @@
+import express from 'express';
+import cookieParser from 'cookie-parser';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import authRoutes from './routes/auth';
+dotenv.config({ path: '../../.env.local' });
+const app = express();
+const PORT = process.env.PORT || 3001;
+app.use(cors({ origin: process.env.APP_URL || 'http://localhost:3000', credentials: true }));
+app.use(express.json());
+app.use(cookieParser());
+app.use('/api/v1/auth', authRoutes);
+app.get('/health', (_, res) => res.json({ status: 'ok' }));
+app.listen(PORT, () => console.log('API running on port ' + PORT));
