@@ -11,11 +11,7 @@ const auth_1 = __importDefault(require("./routes/auth"));
 dotenv_1.default.config({ path: '../../.env.local' });
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3001;
-const allowedOrigins = (process.env.APP_URL || 'http://localhost:3000').split(',');
-app.use((0, cors_1.default)({ origin: (origin, cb) => { if (!origin || allowedOrigins.includes(origin))
-        cb(null, true);
-    else
-        cb(new Error('Not allowed by CORS')); }, credentials: true }));
+app.use((0, cors_1.default)({ origin: true, credentials: true }));
 app.use(express_1.default.json());
 app.use((0, cookie_parser_1.default)());
 app.use('/api/v1/auth', auth_1.default);
