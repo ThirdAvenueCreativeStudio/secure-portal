@@ -20,7 +20,7 @@ const ALLOWED_MIMES = ['application/pdf','image/jpeg','image/png','image/jpg'];
 const BUCKET = process.env.S3_BUCKET_NAME || 'docuhogar-docs';
 
 router.post('/upload', upload.single('file'), async (req: Request, res: Response) => {
-  const userId = req.cookies?.session;
+  const userId = req.cookies?.session || req.headers['x-user-id'] as string;
   if (!userId) return res.status(401).json({ error: 'Not authenticated' });
   if (!req.file) return res.status(400).json({ error: 'No file provided' });
 
@@ -73,7 +73,7 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
 });
 
 router.get('/:id/view', async (req: Request, res: Response) => {
-  const userId = req.cookies?.session;
+  const userId = req.cookies?.session || req.headers['x-user-id'] as string;
   if (!userId) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const doc = await pool.query('SELECT * FROM documents WHERE id=$1', [req.params.id]);

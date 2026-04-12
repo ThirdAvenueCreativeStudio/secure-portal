@@ -30,7 +30,7 @@ export default function Dashboard(){
     fd.append("file",file);
     fd.append("doc_type",docKey);
     try{
-      const res=await fetch(process.env.NEXT_PUBLIC_API_URL+"/api/v1/documents/upload",{method:"POST",credentials:"include",body:fd});
+      const res=await fetch(process.env.NEXT_PUBLIC_API_URL+"/api/v1/documents/upload",{method:"POST",credentials:"include",headers:{"x-user-id":user?.id||""},body:fd});
       const data=await res.json();
       if(data.success)setDocStatus(prev=>({...prev,[docKey]:"uploaded"}));
     }catch{alert("Upload failed.");}

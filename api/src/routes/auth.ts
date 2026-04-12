@@ -49,7 +49,7 @@ router.get('/verify', async (req: Request, res: Response) => {
   } catch(err) { console.error(err); return res.status(500).json({ error: 'Verification failed' }); }
 });
 router.post('/logout', async (req: Request, res: Response) => {
-  const userId = req.cookies?.session;
+  const userId = req.cookies?.session || req.headers['x-user-id'] as string;
   if (userId) await pool.query("INSERT INTO audit_log (actor_id,action,entity_type,entity_id) VALUES ($1,'auth.logout','user',$1)", [userId]).catch(()=>{});
   res.clearCookie('session');
   return res.json({ success: true });
