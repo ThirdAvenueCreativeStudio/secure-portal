@@ -19,6 +19,14 @@ export default function Dashboard(){
     const p=JSON.parse(u);
     setUser(p);
     setLocale(p.locale||'es');
+    fetch(process.env.NEXT_PUBLIC_API_URL+'/api/v1/applications/me',{credentials:'include',headers:{'x-user-id':p.id}})
+    .then(r=>r.json()).then(data=>{
+      if(data.documents){
+        const s: Record<string,string>={};
+        data.documents.forEach((d: {doc_type:string;status:string})=>{ s[d.doc_type]=d.status; });
+        setDocStatus(s);
+      }
+    }).catch(()=>{});
   },[]);
 
   const approved=Object.values(docStatus).filter(s=>s==='approved').length;
