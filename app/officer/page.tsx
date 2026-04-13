@@ -58,6 +58,7 @@ export default function OfficerDashboard() {
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div><div style={{fontSize:"14px",fontWeight:500}}>{doc.doc_type.replace(/_/g," ")}</div>
             <span style={{fontSize:"10px",padding:"3px 8px",borderRadius:"5px",background:sBg[doc.status]||"#F3F4F6",color:sColor[doc.status]||"#6B7280"}}>{doc.status}</span></div>
+            <div style={{display:"flex",gap:"8px"}}><button onClick={async()=>{const r=await fetch(API+"/api/v1/officer/documents/"+doc.id+"/view",{credentials:"include",headers:{"x-user-id":user.id}});const d=await r.json();if(d.url)window.open(d.url,"_blank");}} style={{padding:"6px 14px",background:"#EBF0FA",color:"#185FA5",border:"none",borderRadius:"8px",cursor:"pointer",fontSize:"12px",fontWeight:500}}>View</button></div>
             {doc.status==="uploaded"&&(<div style={{display:"flex",gap:"8px"}}>
               <button onClick={()=>reviewDoc(doc.id,"approved")} style={{padding:"6px 14px",background:"#EAF5EE",color:"#1D7A4E",border:"none",borderRadius:"8px",cursor:"pointer",fontSize:"12px",fontWeight:500}}>Approve</button>
               <button onClick={()=>{const r=prompt("Rejection reason:");if(r)reviewDoc(doc.id,"rejected",r);}} style={{padding:"6px 14px",background:"#FDECEC",color:"#9B2626",border:"none",borderRadius:"8px",cursor:"pointer",fontSize:"12px",fontWeight:500}}>Reject</button>

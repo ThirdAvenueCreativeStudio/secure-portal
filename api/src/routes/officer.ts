@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../lib/db';
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 const router = Router();
 
 async function requireOfficer(req: Request, res: Response): Promise<string|null> {
@@ -48,6 +50,20 @@ router.patch('/documents/:id', async (req: Request, res: Response) => {
     await pool.query('UPDATE documents SET status=$1,rejection_reason=$2,reviewed_at=NOW(),reviewed_by=$3 WHERE id=$4',[status,rejection_reason||null,userId,req.params.id]);
     await pool.query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id) VALUES ($1,$2,$3,$4)',[userId,'doc.'+status,'document',req.params.id]);
     return res.json({ success:true });
+  } catch(err){ console.error(err); return res.status(500).json({ error:'Failed' }); }
+});
+
+
+router.get('/documents/:id/view', async (req: Request, res: Response) => {
+  const userId = await requireOfficer(req, res);
+  if (!userId) return;
+  try {
+    const doc = await pool.query('SELECT * FROM documents WHERE id=$1',[req.params.id]);
+    if (!doc.rows.length) return res.status(404).json({ error:'Not found' });
+    const s3 = new S3Client({ region: process.env.AWS_REGION||'us-east-1', credentials:{ accessKeyId:process.env.AWS_ACCESS_KEY_ID!, secretAccessKey:process.env.AWS_SECRET_ACCESS_KEY! }});
+    const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket: process.env.S3_BUCKET_NAME||'docuhogar-docs', Key: doc.rows[0].s3_key }), { expiresIn: 300 });
+    await pool.query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id) VALUES ($1,$2,$3,$4)',[userId,'doc.viewed','document',req.params.id]);
+    return res.json({ url });
   } catch(err){ console.error(err); return res.status(500).json({ error:'Failed' }); }
 });
 
