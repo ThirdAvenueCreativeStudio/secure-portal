@@ -13,7 +13,7 @@ function VerifyInner(){
     fetch(url,{credentials:'include'})
     .then(r=>r.json())
     .then(data=>{
-      if(data.success){localStorage.setItem('user',JSON.stringify(data.user));router.push('/dashboard');}
+      if(data.success){localStorage.setItem('user',JSON.stringify(data.user));const role=data.user.role;router.push(['officer','admin'].includes(role)?'/officer':'/dashboard');}
       else setStatus(data.error||'invalid');
     }).catch(()=>setStatus('error'));
   },[]);
