@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../lib/db';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { createDecipheriv } from 'crypto';
 const router = Router();
 
 async function requireOfficer(req: Request, res: Response): Promise<string|null> {
@@ -13,6 +13,7 @@ async function requireOfficer(req: Request, res: Response): Promise<string|null>
   }
   return userId;
 }
+
 router.get('/applications', async (req: Request, res: Response) => {
   const userId = await requireOfficer(req, res);
   if (!userId) return;
@@ -31,7 +32,8 @@ router.get('/applications', async (req: Request, res: Response) => {
     return res.json({ applications: apps.rows });
   } catch(err){ console.error(err); return res.status(500).json({ error:'Failed' }); }
 });
-router.get('/applications/:id', async (req: Request, res: Response) => {
+
+router.get('/applications/:id', async (req, res) => {
   const userId = await requireOfficer(req, res);
   if (!userId) return;
   try {
@@ -41,7 +43,8 @@ router.get('/applications/:id', async (req: Request, res: Response) => {
     return res.json({ application:app.rows[0], documents:docs.rows });
   } catch(err){ console.error(err); return res.status(500).json({ error:'Failed' }); }
 });
-router.patch('/documents/:id', async (req: Request, res: Response) => {
+
+router.patch('/documents/:id', async (req, res) => {
   const userId = await requireOfficer(req, res);
   if (!userId) return;
   const { status, rejection_reason } = req.body;
@@ -53,18 +56,33 @@ router.patch('/documents/:id', async (req: Request, res: Response) => {
   } catch(err){ console.error(err); return res.status(500).json({ error:'Failed' }); }
 });
 
-
-router.get('/documents/:id/view', async (req: Request, res: Response) => {
+router.get('/documents/:id/view', async (req, res) => {
   const userId = await requireOfficer(req, res);
   if (!userId) return;
   try {
-    const doc = await pool.query('SELECT * FROM documents WHERE id=$1',[req.params.id]);
-    if (!doc.rows.length) return res.status(404).json({ error:'Not found' });
-    const s3 = new S3Client({ region: process.env.AWS_REGION||'us-east-1', credentials:{ accessKeyId:process.env.AWS_ACCESS_KEY_ID!, secretAccessKey:process.env.AWS_SECRET_ACCESS_KEY! }});
-    const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket: process.env.S3_BUCKET_NAME||'docuhogar-docs', Key: doc.rows[0].s3_key }), { expiresIn: 300 });
+    const docRes = await pool.query('SELECT * FROM documents WHERE id=$1',[req.params.id]);
+    if (!docRes.rows.length) return res.status(404).json({ error:'Not found' });
+    const doc = docRes.rows[0];
+    const s3 = new S3Client({ region: process.env.AWS_REGION||'us-east-1', credentials:{ accessKeyId:process.env.AWS_ACCESS_KEY_ID, secretAccessKey:process.env.AWS_SECRET_ACCESS_KEY }});
+    const obj = await s3.send(new GetObjectCommand({ Bucket: process.env.S3_BUCKET_NAME||'docuhogar-docs', Key: doc.s3_key }));
+    const meta = obj.Metadata || {};
+    const key = Buffer.from(meta.key, 'hex');
+    const iv = Buffer.from(meta.iv, 'hex');
+    const chunks = [];
+    const bodyStream = obj.Body as any;
+    for await (const chunk of bodyStream) chunks.push(Buffer.from(chunk));
+    const payload = Buffer.concat(chunks);
+    const authTag = payload.subarray(0,16);
+    const ciphertext = payload.subarray(16);
+    const decipher = createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(authTag);
+    const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
     await pool.query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id) VALUES ($1,$2,$3,$4)',[userId,'doc.viewed','document',req.params.id]);
-    return res.json({ url });
-  } catch(err){ console.error(err); return res.status(500).json({ error:'Failed' }); }
+    res.setHeader('Content-Type', doc.mime_type||'application/octet-stream');
+    res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('Content-Length', decrypted.length);
+    return res.send(decrypted);
+  } catch(err){ console.error(err); return res.status(500).json({ error:'Failed to decrypt' }); }
 });
 
 export default router;

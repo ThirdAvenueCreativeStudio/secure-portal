@@ -56,7 +56,7 @@ router.get('/verify', async (req, res) => {
     }
 });
 router.post('/logout', async (req, res) => {
-    const userId = req.cookies?.session;
+    const userId = req.cookies?.session || req.headers['x-user-id'];
     if (userId)
         await db_1.pool.query("INSERT INTO audit_log (actor_id,action,entity_type,entity_id) VALUES ($1,'auth.logout','user',$1)", [userId]).catch(() => { });
     res.clearCookie('session');
