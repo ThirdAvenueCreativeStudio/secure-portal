@@ -1,0 +1,142 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const db_1 = require("../lib/db");
+const mailer_1 = require("../lib/mailer");
+const crypto_1 = require("crypto");
+const router = (0, express_1.Router)();
+async function requireAdmin(req, res) {
+    const userId = req.cookies?.session || req.headers['x-user-id'];
+    if (!userId) {
+        res.status(401).json({ error: 'Not authenticated' });
+        return null;
+    }
+    const u = await db_1.pool.query('SELECT role FROM users WHERE id=$1', [userId]);
+    if (!u.rows.length || u.rows[0].role !== 'admin') {
+        res.status(403).json({ error: 'Admin access required' });
+        return null;
+    }
+    return userId;
+}
+// GET /admin/stats — dashboard counts
+router.get('/stats', async (req, res) => {
+    const userId = await requireAdmin(req, res);
+    if (!userId)
+        return;
+    try {
+        const [apps, docs, users, pending] = await Promise.all([
+            db_1.pool.query('SELECT COUNT(*) FROM applications'),
+            db_1.pool.query('SELECT COUNT(*) FROM documents'),
+            db_1.pool.query("SELECT COUNT(*) FROM users WHERE role='applicant'"),
+            db_1.pool.query("SELECT COUNT(*) FROM documents WHERE status IN ('pending','uploaded')"),
+        ]);
+        return res.json({
+            applications: parseInt(apps.rows[0].count),
+            documents: parseInt(docs.rows[0].count),
+            applicants: parseInt(users.rows[0].count),
+            pendingReview: parseInt(pending.rows[0].count),
+        });
+    }
+    catch (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'Failed' });
+    }
+});
+// GET /admin/users
+router.get('/users', async (req, res) => {
+    const userId = await requireAdmin(req, res);
+    if (!userId)
+        return;
+    try {
+        const users = await db_1.pool.query('SELECT id,email,full_name,role,locale,created_at FROM users ORDER BY created_at DESC');
+        return res.json({ users: users.rows });
+    }
+    catch (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'Failed' });
+    }
+});
+// POST /admin/invite-officer
+router.post('/invite-officer', async (req, res) => {
+    const userId = await requireAdmin(req, res);
+    if (!userId)
+        return;
+    const { email, full_name } = req.body;
+    if (!email)
+        return res.status(400).json({ error: 'Email required' });
+    try {
+        const existing = await db_1.pool.query('SELECT id FROM users WHERE email=$1', [email]);
+        if (!existing.rows.length) {
+            await db_1.pool.query("INSERT INTO users (email,full_name,role,locale) VALUES ($1,$2,'officer','es')", [email, full_name || '']);
+        }
+        else {
+            await db_1.pool.query("UPDATE users SET role='officer' WHERE email=$1", [email]);
+        }
+        const raw = (0, crypto_1.randomBytes)(32).toString('hex');
+        const hash = (0, crypto_1.createHash)('sha256').update(raw).digest('hex');
+        const exp = new Date(Date.now() + 15 * 60 * 1000);
+        const u = await db_1.pool.query('SELECT id FROM users WHERE email=$1', [email]);
+        await db_1.pool.query('INSERT INTO auth_tokens (user_id,token_hash,expires_at) VALUES ($1,$2,$3)', [u.rows[0].id, hash, exp]);
+        await (0, mailer_1.sendMagicLink)(email, raw, 'es');
+        await db_1.pool.query('INSERT INTO audit_log (actor_id,action,entity_type,metadata) VALUES ($1,$2,$3,$4)', [userId, 'user.invited', 'user', JSON.stringify({ email })]);
+        return res.json({ success: true });
+    }
+    catch (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'Failed' });
+    }
+});
+// GET /admin/audit-log
+router.get('/audit-log', async (req, res) => {
+    const userId = await requireAdmin(req, res);
+    if (!userId)
+        return;
+    const { action, lim = 100 } = req.query;
+    try {
+        let q = 'SELECT al.*,u.email as actor_email FROM audit_log al LEFT JOIN users u ON u.id=al.actor_id WHERE 1=1';
+        const params = [];
+        if (action) {
+            params.push(action);
+            q += ` AND al.action=$${params.length}`;
+        }
+        params.push(Math.min(Number(lim), 500));
+        q += ` ORDER BY al.created_at DESC LIMIT $${params.length}`;
+        const logs = await db_1.pool.query(q, params);
+        return res.json({ logs: logs.rows });
+    }
+    catch (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'Failed' });
+    }
+});
+// POST /admin/expire-docs
+router.post('/expire-docs', async (req, res) => {
+    if (req.headers['x-cron-secret'] !== process.env.CRON_SECRET)
+        return res.status(401).json({ error: 'Unauthorized' });
+    try {
+        const r = await db_1.pool.query("UPDATE documents SET status='expired' WHERE expires_at IS NOT NULL AND expires_at<NOW() AND status NOT IN ('expired','approved') RETURNING id");
+        return res.json({ expired: r.rowCount });
+    }
+    catch (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'Failed' });
+    }
+});
+// PATCH /admin/users/:id/role
+router.patch('/users/:id/role', async (req, res) => {
+    const userId = await requireAdmin(req, res);
+    if (!userId)
+        return;
+    const { role } = req.body;
+    if (!['applicant', 'officer', 'admin'].includes(role))
+        return res.status(400).json({ error: 'Invalid role' });
+    try {
+        await db_1.pool.query('UPDATE users SET role=$1 WHERE id=$2', [role, req.params.id]);
+        return res.json({ success: true });
+    }
+    catch (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'Failed' });
+    }
+});
+exports.default = router;
