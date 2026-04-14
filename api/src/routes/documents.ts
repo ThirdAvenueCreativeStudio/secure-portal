@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { notifyOfficerDocUploaded } from '../lib/notify';
 import multer from 'multer';
 import { randomBytes, createCipheriv } from 'crypto';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
@@ -68,6 +69,15 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
       'INSERT INTO audit_log (actor_id,action,entity_type,metadata) VALUES ($1,$2,$3,$4)',
       [userId, 'doc.uploaded', 'document', JSON.stringify({doc_type, size: req.file.size})]
     );
+    // Notify officer — find any officer/admin for this bank (or globally)
+    try {
+      const officers = await pool.query("SELECT u.email, u.full_name FROM users u WHERE u.role IN ('officer','admin') LIMIT 5");
+      const applicant = await pool.query('SELECT full_name FROM users WHERE id=$1',[userId]);
+      const name = applicant.rows[0]?.full_name || 'Applicant';
+      for (const officer of officers.rows) {
+        await notifyOfficerDocUploaded({ officerEmail:officer.email, applicantName:name, docType:doc_type });
+      }
+    } catch(ne){ console.error('notify error',ne); }
     return res.json({ success: true, doc_type, status: 'uploaded' });
   } catch(err) { console.error(err); return res.status(500).json({ error: 'Upload failed' }); }
 });

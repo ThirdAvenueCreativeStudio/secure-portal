@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
+const notify_1 = require("../lib/notify");
 const multer_1 = __importDefault(require("multer"));
 const crypto_1 = require("crypto");
 const client_s3_1 = require("@aws-sdk/client-s3");
@@ -58,6 +59,18 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         }
         await db_1.pool.query('INSERT INTO documents (application_id,doc_type,status,s3_key,s3_iv,original_filename,file_size_bytes,mime_type,uploaded_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW()) ON CONFLICT DO NOTHING', [applicationId, doc_type, 'uploaded', s3Key, iv.toString('hex'), req.file.originalname, req.file.size, req.file.mimetype]);
         await db_1.pool.query('INSERT INTO audit_log (actor_id,action,entity_type,metadata) VALUES ($1,$2,$3,$4)', [userId, 'doc.uploaded', 'document', JSON.stringify({ doc_type, size: req.file.size })]);
+        // Notify officer — find any officer/admin for this bank (or globally)
+        try {
+            const officers = await db_1.pool.query("SELECT u.email, u.full_name FROM users u WHERE u.role IN ('officer','admin') LIMIT 5");
+            const applicant = await db_1.pool.query('SELECT full_name FROM users WHERE id=$1', [userId]);
+            const name = applicant.rows[0]?.full_name || 'Applicant';
+            for (const officer of officers.rows) {
+                await (0, notify_1.notifyOfficerDocUploaded)({ officerEmail: officer.email, applicantName: name, docType: doc_type });
+            }
+        }
+        catch (ne) {
+            console.error('notify error', ne);
+        }
         return res.json({ success: true, doc_type, status: 'uploaded' });
     }
     catch (err) {

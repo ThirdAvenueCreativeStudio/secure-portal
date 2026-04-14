@@ -4,6 +4,7 @@ const express_1 = require("express");
 const db_1 = require("../lib/db");
 const client_s3_1 = require("@aws-sdk/client-s3");
 const crypto_1 = require("crypto");
+const notify_1 = require("../lib/notify");
 const router = (0, express_1.Router)();
 async function requireOfficer(req, res) {
     const userId = req.cookies?.session || req.headers['x-user-id'];
@@ -67,6 +68,19 @@ router.patch('/documents/:id', async (req, res) => {
     try {
         await db_1.pool.query('UPDATE documents SET status=$1,rejection_reason=$2,reviewed_at=NOW(),reviewed_by=$3 WHERE id=$4', [status, rejection_reason || null, userId, req.params.id]);
         await db_1.pool.query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id) VALUES ($1,$2,$3,$4)', [userId, 'doc.' + status, 'document', req.params.id]);
+        try {
+            const r = await db_1.pool.query('SELECT d.doc_type,u.email,u.full_name,u.locale FROM documents d JOIN applications a ON a.id=d.application_id JOIN users u ON u.id=a.applicant_id WHERE d.id=$1', [req.params.id]);
+            if (r.rows.length) {
+                const { doc_type, email, full_name, locale } = r.rows[0];
+                if (status === 'approved')
+                    await (0, notify_1.notifyApplicantDocApproved)({ applicantEmail: email, applicantName: full_name, docType: doc_type, locale });
+                else
+                    await (0, notify_1.notifyApplicantDocRejected)({ applicantEmail: email, applicantName: full_name, docType: doc_type, reason: rejection_reason || '', locale });
+            }
+        }
+        catch (ne) {
+            console.error('notify err', ne);
+        }
         return res.json({ success: true });
     }
     catch (err) {
@@ -107,6 +121,27 @@ router.get('/documents/:id/view', async (req, res) => {
     catch (err) {
         console.error(err);
         return res.status(500).json({ error: 'Failed to decrypt' });
+    }
+});
+// POST /officer/notify/idle
+router.post('/notify/idle', async (req, res) => {
+    if (req.headers['x-cron-secret'] !== process.env.CRON_SECRET)
+        return res.status(401).json({ error: 'Unauthorized' });
+    try {
+        const idle = await db_1.pool.query("SELECT u.email,u.full_name,u.locale,a.id as app_id FROM applications a JOIN users u ON u.id=a.applicant_id WHERE a.updated_at<NOW()-INTERVAL '48 hours' AND a.status='in_progress'");
+        let sent = 0;
+        for (const row of idle.rows) {
+            const docs = await db_1.pool.query("SELECT doc_type FROM documents WHERE application_id=$1 AND status IN ('pending','rejected')", [row.app_id]);
+            if (!docs.rows.length)
+                continue;
+            await (0, notify_1.notifyApplicantIdleReminder)({ applicantEmail: row.email, applicantName: row.full_name, pendingDocs: docs.rows.map((d) => d.doc_type), locale: row.locale });
+            sent++;
+        }
+        return res.json({ sent });
+    }
+    catch (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'Failed' });
     }
 });
 exports.default = router;
