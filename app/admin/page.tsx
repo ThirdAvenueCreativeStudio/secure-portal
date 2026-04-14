@@ -9,6 +9,7 @@ export default function AdminPage() {
   const [stats, setStats] = useState<any>(null);
   const [users, setUsers] = useState<any[]>([]);
   const [apps, setApps] = useState<any[]>([]);
+  const [docs, setDocs] = useState<any[]>([]);
   const [pending, setPending] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -27,6 +28,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (!user) return;
     if (tab === "users") fetch(API + "/api/v1/admin/users", { headers: { "x-user-id": user.id } }).then(r => r.json()).then(d => setUsers(d.users || [])).catch(console.error);
+    if (tab === "documents") fetch(API + "/api/v1/admin/documents", { headers: { "x-user-id": user.id } }).then(r=>r.json()).then(d=>setDocs(d.docs||[])).catch(console.error);
     if (tab === "applications" || tab === "pending") fetch(API + "/api/v1/officer/applications", { headers: { "x-user-id": user.id } }).then(r => r.json()).then(d => setApps(d.applications || [])).catch(console.error);
     if (tab === "audit") fetch(API + "/api/v1/admin/audit-log", { headers: { "x-user-id": user.id } }).then(r => r.json()).then(d => setLogs(d.logs || [])).catch(console.error);
   }, [tab, user]);
@@ -40,7 +42,7 @@ export default function AdminPage() {
 
   if (!user) return <main style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "sans-serif" }}>Loading...</main>;
 
-  const TABS = [{ id: "stats", label: "Dashboard" },{ id: "applications", label: "Applications" },{ id: "users", label: "Users" },{ id: "pending", label: "Pending Review" },{ id: "audit", label: "Audit Log" },{ id: "invite", label: "Invite Officer" }];
+  const TABS = [{ id: "stats", label: "Dashboard" },{ id: "applications", label: "Applications" },{ id: "documents", label: "Documents" },{ id: "users", label: "Users" },{ id: "pending", label: "Pending Review" },{ id: "audit", label: "Audit Log" },{ id: "invite", label: "Invite Officer" }];
   return (
     <main style={{ fontFamily:"sans-serif", background:"#F4F7FB", minHeight:"100vh" }}>
       <div style={{ background:NAVY, color:"white", padding:"16px 32px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
@@ -64,7 +66,7 @@ export default function AdminPage() {
             <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16}}>
               {([
                 {label:"Applications",val:stats?.applications,dest:"applications",color:"#0F2340"},
-                {label:"Documents",val:stats?.documents,dest:"audit",color:"#1a7a4a"},
+                {label:"Documents",val:stats?.documents,dest:"documents",color:"#1a7a4a"},
                 {label:"Applicants",val:stats?.applicants,dest:"users",color:"#0F2340"},
                 {label:"Pending Review",val:stats?.pendingReview,dest:"pending",color:"#c0392b"},
               ]).map(({label,val,dest,color})=>(
@@ -96,6 +98,23 @@ export default function AdminPage() {
             ))}</tbody>
           </table>
         </div>)}
+        {tab==="documents" && (<div>
+          <h2 style={{color:"#0F2340",marginBottom:16}}>All Documents</h2>
+          <table style={{width:"100%",borderCollapse:"collapse",background:"white"}}>
+            <thead><tr style={{background:"#F4F7FB"}}>
+              <th style={{padding:"12px",textAlign:"left",fontSize:12}}>Applicant</th>
+              <th style={{padding:"12px",textAlign:"left",fontSize:12}}>Type</th>
+              <th style={{padding:"12px",textAlign:"left",fontSize:12}}>Status</th>
+              <th style={{padding:"12px",textAlign:"left",fontSize:12}}>Uploaded</th>
+            </tr></thead>
+            <tbody>{docs.map((d:any)=>(
+              <tr key={d.id} style={{borderTop:"1px solid #eee"}}>
+                <td style={{padding:"12px",fontSize:13}}>{d.full_name||d.email}</td>
+                <td style={{padding:"12px",fontWeight:600,color:"#0F2340"}}>{(d.doc_type||"").replace(/_/g," ")}</td>
+                <td style={{padding:"12px"}}><span style={{padding:"3px 10px",borderRadius:20,fontSize:12,fontWeight:600}}>{d.status}</span></td>
+                <td style={{padding:"12px",fontSize:12,color:"#999"}}>{d.uploaded_at?new Date(d.uploaded_at).toLocaleDateString():"-"}</td>
+              </tr>
+            ))}</tbody></table></div>)}
         {(tab==="applications"||tab==="pending") && (<div>
           <h2 style={{color:"#0F2340",marginBottom:16}}>{tab==="pending"?"Pending Review":"Applications"}</h2>
           <table style={{width:"100%",borderCollapse:"collapse",background:"white",borderRadius:12}}>

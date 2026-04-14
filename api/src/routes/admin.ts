@@ -100,4 +100,20 @@ router.patch('/users/:id/role', async (req: Request, res: Response) => {
   } catch(err){ console.error(err); return res.status(500).json({error:'Failed'}); }
 });
 
+// GET /admin/documents
+router.get('/documents', async (req: Request, res: Response) => {
+  const userId = await requireAdmin(req, res); if (!userId) return;
+  try {
+    const docs = await pool.query(`
+      SELECT d.id,d.doc_type,d.status,d.mime_type,d.file_size_bytes,d.uploaded_at,d.reviewed_at,d.rejection_reason,
+        u.email,u.full_name
+      FROM documents d
+      JOIN applications a ON a.id=d.application_id
+      JOIN users u ON u.id=a.applicant_id
+      ORDER BY d.uploaded_at DESC LIMIT 200
+    `);
+    return res.json({ docs: docs.rows });
+  } catch(err){ console.error(err); return res.status(500).json({ error:'Failed' }); }
+});
+
 export default router;
