@@ -9,6 +9,7 @@ export default function AdminPage() {
   const [stats, setStats] = useState<any>(null);
   const [users, setUsers] = useState<any[]>([]);
   const [apps, setApps] = useState<any[]>([]);
+  const [officers, setOfficers] = useState<any[]>([]);
   const [docs, setDocs] = useState<any[]>([]);
   const [pending, setPending] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
@@ -27,11 +28,21 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!user) return;
+    fetch(API + "/api/v1/admin/users", { headers: { "x-user-id": user.id } }).then(r=>r.json()).then(d=>setOfficers((d.users||[]).filter((u:any)=>["officer","admin"].includes(u.role)))).catch(console.error);
     if (tab === "users") fetch(API + "/api/v1/admin/users", { headers: { "x-user-id": user.id } }).then(r => r.json()).then(d => setUsers(d.users || [])).catch(console.error);
     if (tab === "documents") fetch(API + "/api/v1/admin/documents", { headers: { "x-user-id": user.id } }).then(r=>r.json()).then(d=>setDocs(d.docs||[])).catch(console.error);
     if (tab === "applications" || tab === "pending") fetch(API + "/api/v1/officer/applications", { headers: { "x-user-id": user.id } }).then(r => r.json()).then(d => setApps(d.applications || [])).catch(console.error);
     if (tab === "audit") fetch(API + "/api/v1/admin/audit-log", { headers: { "x-user-id": user.id } }).then(r => r.json()).then(d => setLogs(d.logs || [])).catch(console.error);
   }, [tab, user]);
+  async function assignOfficer(appId:string, officerId:string) {
+    if (!user) return;
+    await fetch(API + "/api/v1/admin/applications/"+appId+"/assign", {
+      method:"PATCH", headers:{"Content-Type":"application/json","x-user-id":user.id},
+      body:JSON.stringify({officer_id:officerId||null})
+    });
+    setApps(prev=>prev.map((a:any)=>a.id===appId?{...a,assigned_to:officerId,assigned_email:officers.find((o:any)=>o.id===officerId)?.email}:a));
+  }
+
   async function inviteOfficer() {
     if (!inviteEmail || !user) return;
     const r = await fetch(API + "/api/v1/admin/invite-officer", { method: "POST", headers: { "Content-Type": "application/json", "x-user-id": user.id }, body: JSON.stringify({ email: inviteEmail, full_name: inviteName }) });
@@ -122,14 +133,16 @@ export default function AdminPage() {
               <th style={{padding:"12px",textAlign:"left",fontSize:12}}>Applicant</th>
               <th style={{padding:"12px",textAlign:"left",fontSize:12}}>Status</th>
               <th style={{padding:"12px",textAlign:"left",fontSize:12}}>Docs</th>
+              <th style={{padding:"12px",textAlign:"left",fontSize:12}}>Assigned To</th>
               <th style={{padding:"12px",textAlign:"left",fontSize:12}}>Updated</th>
             </tr></thead>
             <tbody>{apps.filter((a:any)=>tab!=="pending"||(a.total_docs-a.approved_docs)>0).map((a:any)=>(
               <tr key={a.id} style={{borderTop:"1px solid #eee"}}>
-                <td style={{padding:"12px"}}><strong>{a.full_name||a.email}</strong></td>
-                <td style={{padding:"12px"}}>{a.status}</td>
+                <td style={{padding:"12px"}}><div style={{fontWeight:600}}>{a.full_name||a.email}</div><div style={{fontSize:12,color:"#999"}}>{a.email}</div></td>
+                <td style={{padding:"12px"}}><span style={{padding:"3px 10px",borderRadius:20,fontSize:12,fontWeight:600,background:a.status==="approved"?"#f0fff4":a.status==="rejected"?"#fff0f0":"#f0f4ff",color:a.status==="approved"?"#1a7a4a":a.status==="rejected"?"#c0392b":"#0F2340"}}>{a.status}</span></td>
                 <td style={{padding:"12px"}}>{a.approved_docs}/{a.total_docs} docs</td>
-                <td style={{padding:"12px",color:"#999"}}>{new Date(a.updated_at).toLocaleDateString()}</td>
+                <td style={{padding:"12px"}}><select value={a.assigned_to||""} onChange={e=>assignOfficer(a.id,e.target.value)} style={{padding:"6px 10px",border:"1px solid #ddd",borderRadius:6,fontSize:13,cursor:"pointer"}}><option value="">Unassigned</option>{officers.map((o:any)=>(<option key={o.id} value={o.id}>{o.full_name||o.email}</option>))}</select></td>
+                <td style={{padding:"12px",fontSize:12,color:"#999"}}>{new Date(a.updated_at).toLocaleDateString()}</td>
               </tr>
             ))}</tbody></table></div>)}
         {tab==="invite" && (<div>

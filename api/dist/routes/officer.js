@@ -26,13 +26,15 @@ router.get('/applications', async (req, res) => {
     try {
         const apps = await db_1.pool.query(`
       SELECT a.id, a.status, a.created_at, a.updated_at, a.loan_amount_usd, a.property_address,
-        u.email, u.full_name, u.phone,
+        a.assigned_to, u.email, u.full_name, u.phone,
+        ou.email as assigned_email, ou.full_name as assigned_name,
         COUNT(d.id) as total_docs,
         COUNT(CASE WHEN d.status='approved' THEN 1 END) as approved_docs
       FROM applications a
       JOIN users u ON u.id=a.applicant_id
+      LEFT JOIN users ou ON ou.id=a.assigned_to
       LEFT JOIN documents d ON d.application_id=a.id
-      GROUP BY a.id, u.email, u.full_name, u.phone
+      GROUP BY a.id, u.email, u.full_name, u.phone, ou.email, ou.full_name
       ORDER BY a.updated_at DESC
     `);
         return res.json({ applications: apps.rows });

@@ -116,4 +116,15 @@ router.get('/documents', async (req: Request, res: Response) => {
   } catch(err){ console.error(err); return res.status(500).json({ error:'Failed' }); }
 });
 
+// PATCH /admin/applications/:id/assign
+router.patch('/applications/:id/assign', async (req: Request, res: Response) => {
+  const userId = await requireAdmin(req, res); if (!userId) return;
+  const { officer_id } = req.body;
+  try {
+    await pool.query('UPDATE applications SET assigned_to=$1, updated_at=NOW() WHERE id=$2',[officer_id||null, req.params.id]);
+    await pool.query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id,metadata) VALUES ($1,$2,$3,$4,$5)',[userId,'app.assigned','application',req.params.id,JSON.stringify({assigned_to:officer_id})]);
+    return res.json({ success:true });
+  } catch(err){ console.error(err); return res.status(500).json({ error:'Failed' }); }
+});
+
 export default router;
