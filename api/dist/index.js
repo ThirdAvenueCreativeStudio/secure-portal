@@ -88,6 +88,7 @@ app.use('/api/v1/officer', officer_1.default);
 app.use('/api/v1/admin', admin_1.default);
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
 app.use(errorHandler_1.notFound);
-// Sentry error handler applied via init
+if (process.env.SENTRY_DSN)
+    Sentry.setupExpressErrorHandler(app);
 app.use(errorHandler_1.errorHandler);
 app.listen(PORT, () => console.log('API running on port ' + PORT));
