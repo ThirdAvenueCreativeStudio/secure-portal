@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = process.env.FROM_EMAIL || 'onboarding@resend.dev';
-const APP_URL = process.env.APP_URL || 'https://secure-portal-beta.vercel.app';
+const APP_URL = process.env.APP_URL || 'https://demo.docuhogar.com';
 function brand(body: string) {
   return '<div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px"><div style="margin-bottom:24px"><span style="font-size:18px;font-weight:700;color:#0F2340">DocuHogar</span></div>' + body + '<div style="margin-top:32px;padding-top:16px;border-top:1px solid #eee;font-size:12px;color:#999">DocuHogar &mdash; Portal Seguro</div></div>';
 }
