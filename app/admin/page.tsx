@@ -169,6 +169,26 @@ export default function AdminPage() {
                 <td style={{padding:"12px",fontSize:12,color:"#999"}}>{new Date(a.updated_at).toLocaleDateString()}</td>
               </tr>
             ))}</tbody></table></div>)}
+        {tab==="banks" && (<div>
+          <h2 style={{color:"#0F2340",marginBottom:24}}>Bancos</h2>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:32}}>
+            <div style={{background:"white",padding:24,borderRadius:12}}>
+              <h3 style={{marginBottom:16}}>Crear Banco</h3>
+              <div style={{marginBottom:12}}><label style={{display:"block",fontSize:13,fontWeight:600,marginBottom:4}}>Nombre *</label><input value={newBankName} onChange={e=>setNewBankName(e.target.value)} style={{width:"100%",padding:"10px",border:"1px solid #ddd",borderRadius:8}} /></div>
+              <div style={{marginBottom:16}}><label style={{display:"block",fontSize:13,fontWeight:600,marginBottom:4}}>Email contacto</label><input value={newBankEmail} onChange={e=>setNewBankEmail(e.target.value)} style={{width:"100%",padding:"10px",border:"1px solid #ddd",borderRadius:8}} /></div>
+<button onClick={createBank} style={{width:"100%",padding:"10px",background:"#0F2340",color:"white",border:"none",borderRadius:8,fontWeight:600,cursor:"pointer"}}>Crear Banco</button></div>
+            <div style={{background:"white",padding:24,borderRadius:12}}>
+              <h3 style={{marginBottom:16}}>Invitar Bank Admin</h3>
+              <div style={{marginBottom:12}}><label style={{display:"block",fontSize:13,fontWeight:600,marginBottom:4}}>Banco *</label><select value={selectedBankId} onChange={e=>setSelectedBankId(e.target.value)} style={{width:"100%",padding:"10px",border:"1px solid #ddd",borderRadius:8}}><option value="">Seleccionar banco</option>{banks.map((b:any)=>(<option key={b.id} value={b.id}>{b.name}</option>))}</select></div>
+              <div style={{marginBottom:12}}><label style={{display:"block",fontSize:13,fontWeight:600,marginBottom:4}}>Email *</label><input value={bankAdminEmail} onChange={e=>setBankAdminEmail(e.target.value)} style={{width:"100%",padding:"10px",border:"1px solid #ddd",borderRadius:8}} /></div>
+              <div style={{marginBottom:16}}><label style={{display:"block",fontSize:13,fontWeight:600,marginBottom:4}}>Nombre</label><input value={bankAdminName} onChange={e=>setBankAdminName(e.target.value)} style={{width:"100%",padding:"10px",border:"1px solid #ddd",borderRadius:8}} /></div>
+<button onClick={inviteBankAdmin} style={{width:"100%",padding:"10px",background:"#1a7a4a",color:"white",border:"none",borderRadius:8,fontWeight:600,cursor:"pointer"}}>Invitar Admin</button>
+            </div></div>
+          <div style={{marginTop:32}}><h3 style={{marginBottom:16}}>Registrados</h3>
+<table style={{width:"100%",borderCollapse:"collapse",background:"white"}}><thead><tr><th style={{padding:"12px",textAlign:"left"}}>Banco</th><th style={{padding:"12px",textAlign:"left"}}>Oficiales</th></tr></thead>
+<tbody>{banks.map((b:any)=>(<tr key={b.id} style={{borderTop:"1px solid #eee"}}><td style={{padding:"12px",fontWeight:600}}>{b.name}</td><td style={{padding:"12px"}}>{b.officer_count}</td></tr>))}</tbody></table></div>
+{bankMsg&&<p style={{marginTop:16,fontWeight:500,color:bankMsg.startsWith("Error")?"#c0392b":"#1a7a4a"}}>{bankMsg}</p>}
+        </div>)}
         {tab==="invite" && (<div>
           <h2 style={{color:NAVY,marginBottom:24}}>Invite Officer</h2>
           <div style={{background:'white',padding:32,borderRadius:12,maxWidth:480,boxShadow:'0 1px 4px rgba(0,0,0,0.07)'}}>
