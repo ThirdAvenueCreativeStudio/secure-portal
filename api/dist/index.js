@@ -45,6 +45,7 @@ const documents_1 = __importDefault(require("./routes/documents"));
 const applications_1 = __importDefault(require("./routes/applications"));
 const officer_1 = __importDefault(require("./routes/officer"));
 const admin_1 = __importDefault(require("./routes/admin"));
+const bankadmin_1 = __importDefault(require("./routes/bankadmin"));
 const errorHandler_1 = require("./middleware/errorHandler");
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const Sentry = __importStar(require("@sentry/node"));
@@ -86,6 +87,7 @@ app.use('/api/v1/documents', documents_1.default);
 app.use('/api/v1/applications', applications_1.default);
 app.use('/api/v1/officer', officer_1.default);
 app.use('/api/v1/admin', admin_1.default);
+app.use('/api/v1/bank-admin', bankadmin_1.default);
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
 app.use(errorHandler_1.notFound);
 if (process.env.SENTRY_DSN)

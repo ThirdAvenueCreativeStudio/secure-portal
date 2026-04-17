@@ -10,6 +10,13 @@ export default function AdminPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [apps, setApps] = useState<any[]>([]);
   const [officers, setOfficers] = useState<any[]>([]);
+  const [banks, setBanks] = useState<any[]>([]);
+  const [newBankName, setNewBankName] = useState("");
+  const [newBankEmail, setNewBankEmail] = useState("");
+  const [bankAdminEmail, setBankAdminEmail] = useState("");
+  const [bankAdminName, setBankAdminName] = useState("");
+  const [selectedBankId, setSelectedBankId] = useState("");
+  const [bankMsg, setBankMsg] = useState("");
   const [docs, setDocs] = useState<any[]>([]);
   const [pending, setPending] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
@@ -32,6 +39,7 @@ export default function AdminPage() {
     if (tab === "users") fetch(API + "/api/v1/admin/users", { headers: { "x-user-id": user.id } }).then(r => r.json()).then(d => setUsers(d.users || [])).catch(console.error);
     if (tab === "documents") fetch(API + "/api/v1/admin/documents", { headers: { "x-user-id": user.id } }).then(r=>r.json()).then(d=>setDocs(d.docs||[])).catch(console.error);
     if (tab === "applications" || tab === "pending") fetch(API + "/api/v1/officer/applications", { headers: { "x-user-id": user.id } }).then(r => r.json()).then(d => setApps(d.applications || [])).catch(console.error);
+    if (tab === "banks") fetch(API+"/api/v1/admin/banks",{headers:{"x-user-id":user.id}}).then(r=>r.json()).then(d=>setBanks(d.banks||[])).catch(console.error);
     if (tab === "audit") fetch(API + "/api/v1/admin/audit-log", { headers: { "x-user-id": user.id } }).then(r => r.json()).then(d => setLogs(d.logs || [])).catch(console.error);
   }, [tab, user]);
   async function assignOfficer(appId:string, officerId:string) {
@@ -41,6 +49,22 @@ export default function AdminPage() {
       body:JSON.stringify({officer_id:officerId||null})
     });
     setApps(prev=>prev.map((a:any)=>a.id===appId?{...a,assigned_to:officerId,assigned_email:officers.find((o:any)=>o.id===officerId)?.email}:a));
+  }
+
+  async function createBank() {
+    if (!newBankName||!user) return;
+    const r=await fetch(API+'/api/v1/admin/banks',{method:'POST',headers:{'Content-Type':'application/json','x-user-id':user.id},body:JSON.stringify({name:newBankName,contact_email:newBankEmail})});
+    const d=await r.json();
+    if (d.bank) { setBankMsg('Banco creado: '+d.bank.name); setNewBankName(''); fetch(API+'/api/v1/admin/banks',{headers:{'x-user-id':user.id}}).then(r=>r.json()).then(d=>setBanks(d.banks||[])); }
+    else setBankMsg('Error: '+(d.error||'unknown'));
+  }
+
+  async function inviteBankAdmin() {
+    if (!bankAdminEmail||!selectedBankId||!user) return;
+    const r=await fetch(API+'/api/v1/admin/invite-bank-admin',{method:'POST',headers:{'Content-Type':'application/json','x-user-id':user.id},body:JSON.stringify({email:bankAdminEmail,full_name:bankAdminName,bank_id:selectedBankId})});
+    const d=await r.json();
+    setBankMsg(d.success?'Invitacion enviada a '+bankAdminEmail:'Error: '+(d.error||'unknown'));
+    if (d.success) { setBankAdminEmail(''); setBankAdminName(''); }
   }
 
   async function inviteOfficer() {
@@ -53,7 +77,7 @@ export default function AdminPage() {
 
   if (!user) return <main style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "sans-serif" }}>Loading...</main>;
 
-  const TABS = [{ id: "stats", label: "Dashboard" },{ id: "applications", label: "Applications" },{ id: "documents", label: "Documents" },{ id: "users", label: "Users" },{ id: "pending", label: "Pending Review" },{ id: "audit", label: "Audit Log" },{ id: "invite", label: "Invite Officer" }];
+  const TABS = [{ id: "stats", label: "Dashboard" },{ id: "applications", label: "Applications" },{ id: "documents", label: "Documents" },{ id: "users", label: "Users" },{ id: "pending", label: "Pending Review" },{ id: "audit", label: "Audit Log" },{ id: "invite", label: "Invite Officer" },{ id: "banks", label: "Banks" }];
   return (
     <main style={{ fontFamily:"sans-serif", background:"#F4F7FB", minHeight:"100vh" }}>
       <div style={{ background:NAVY, color:"white", padding:"16px 32px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>

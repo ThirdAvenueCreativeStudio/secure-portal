@@ -177,3 +177,62 @@ router.patch('/applications/:id/assign', async (req, res) => {
     }
 });
 exports.default = router;
+// POST /admin/banks
+router.post('/banks', async (req, res) => {
+    const userId = await requireAdmin(req, res);
+    if (!userId)
+        return;
+    const { name, subdomain, contact_email } = req.body;
+    if (!name)
+        return res.status(400).json({ error: 'Name required' });
+    try {
+        const b = await db_1.pool.query('INSERT INTO banks (name,subdomain,contact_email) VALUES ($1,$2,$3) RETURNING *', [name, subdomain || null, contact_email || null]);
+        return res.json({ bank: b.rows[0] });
+    }
+    catch (e) {
+        console.error(e);
+        return res.status(500).json({ error: 'Failed' });
+    }
+});
+// GET /admin/banks
+router.get('/banks', async (req, res) => {
+    const userId = await requireAdmin(req, res);
+    if (!userId)
+        return;
+    try {
+        const r = await db_1.pool.query('SELECT b.*,COUNT(u.id) as officer_count FROM banks b LEFT JOIN users u ON u.bank_id=b.id GROUP BY b.id ORDER BY b.created_at DESC');
+        return res.json({ banks: r.rows });
+    }
+    catch (e) {
+        console.error(e);
+        return res.status(500).json({ error: 'Failed' });
+    }
+});
+// POST /admin/invite-bank-admin
+router.post('/invite-bank-admin', async (req, res) => {
+    const userId = await requireAdmin(req, res);
+    if (!userId)
+        return;
+    const { email, full_name, bank_id } = req.body;
+    if (!email || !bank_id)
+        return res.status(400).json({ error: 'Email and bank required' });
+    try {
+        const ex = await db_1.pool.query('SELECT id FROM users WHERE email=$1', [email]);
+        if (!ex.rows.length)
+            await db_1.pool.query("INSERT INTO users (email,full_name,role,bank_id,locale) VALUES ($1,$2,'bank_admin',$3,'es')", [email, full_name || '', bank_id]);
+        else
+            await db_1.pool.query("UPDATE users SET role='bank_admin',bank_id=$1 WHERE email=$2", [bank_id, email]);
+        const u = await db_1.pool.query('SELECT id FROM users WHERE email=$1', [email]);
+        const raw = (0, crypto_1.randomBytes)(32).toString('hex');
+        const hash = (0, crypto_1.createHash)('sha256').update(raw).digest('hex');
+        const exp = new Date(Date.now() + 15 * 60 * 1000);
+        await db_1.pool.query('INSERT INTO auth_tokens (user_id,token_hash,expires_at) VALUES ($1,$2,$3)', [u.rows[0].id, hash, exp]);
+        await (0, mailer_1.sendMagicLink)(email, raw, 'es');
+        await db_1.pool.query('INSERT INTO audit_log (actor_id,action,entity_type,metadata) VALUES ($1,$2,$3,$4)', [userId, 'bank_admin.invited', 'user', JSON.stringify({ email, bank_id })]);
+        return res.json({ success: true });
+    }
+    catch (e) {
+        console.error(e);
+        return res.status(500).json({ error: 'Failed' });
+    }
+});
