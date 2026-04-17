@@ -3,8 +3,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const db_1 = require("../lib/db");
 const client_s3_1 = require("@aws-sdk/client-s3");
-const crypto_1 = require("crypto");
 const notify_1 = require("../lib/notify");
+const mailer_1 = require("../lib/mailer");
+const crypto_1 = require("crypto");
 const router = (0, express_1.Router)();
 async function requireOfficer(req, res) {
     const userId = req.cookies?.session || req.headers['x-user-id'];
@@ -140,6 +141,76 @@ router.post('/notify/idle', async (req, res) => {
             sent++;
         }
         return res.json({ sent });
+    }
+    catch (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'Failed' });
+    }
+});
+// POST /officer/invite-applicant
+router.post('/invite-applicant', async (req, res) => {
+    const userId = await requireOfficer(req, res);
+    if (!userId)
+        return;
+    const { email, full_name, locale = 'es' } = req.body;
+    if (!email || !full_name)
+        return res.status(400).json({ error: 'Email and name required' });
+    try {
+        let applicantId;
+        const existing = await db_1.pool.query('SELECT id FROM users WHERE email=$1', [email]);
+        if (existing.rows.length) {
+            applicantId = existing.rows[0].id;
+        }
+        else {
+            const nu = await db_1.pool.query("INSERT INTO users (email,full_name,role,locale) VALUES ($1,$2,'applicant',$3) RETURNING id", [email, full_name, locale]);
+            applicantId = nu.rows[0].id;
+        }
+        const app = await db_1.pool.query("INSERT INTO applications (applicant_id,assigned_to,status) VALUES ($1,$2,'in_progress') RETURNING id", [applicantId, userId]);
+        const appId = app.rows[0].id;
+        const docTypes = ['passport', 'us_address_proof', 'pay_stub', 'bank_statement', 'credit_auth', 'promesa_venta', 'nit', 'remittance_history'];
+        for (const dt of docTypes) {
+            await db_1.pool.query('INSERT INTO documents (application_id,doc_type,status) VALUES ($1,$2,$3)', [appId, dt, 'pending']);
+        }
+        const raw = (0, crypto_1.randomBytes)(32).toString('hex');
+        const hash = (0, crypto_1.createHash)('sha256').update(raw).digest('hex');
+        const exp = new Date(Date.now() + 15 * 60 * 1000);
+        await db_1.pool.query('INSERT INTO auth_tokens (user_id,token_hash,expires_at) VALUES ($1,$2,$3)', [applicantId, hash, exp]);
+        await (0, mailer_1.sendApplicantWelcome)(email, raw, full_name || email, locale);
+        await db_1.pool.query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id,metadata) VALUES ($1,$2,$3,$4,$5)', [userId, 'app.created', 'application', appId, JSON.stringify({ applicant_email: email })]);
+        return res.json({ success: true, application_id: appId });
+    }
+    catch (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'Failed' });
+    }
+});
+const DOC_TYPES = ['passport', 'us_address_proof', 'pay_stub', 'bank_statement', 'credit_auth', 'promesa_venta', 'nit', 'remittance_history'];
+// POST /officer/invite-applicant
+router.post('/invite-applicant', async (req, res) => {
+    const userId = await requireOfficer(req, res);
+    if (!userId)
+        return;
+    const { email, full_name, locale = 'es' } = req.body;
+    if (!email)
+        return res.status(400).json({ error: 'Email required' });
+    try {
+        let uRes = await db_1.pool.query('SELECT id FROM users WHERE email=$1', [email]);
+        if (!uRes.rows.length) {
+            await db_1.pool.query("INSERT INTO users (email,full_name,role,locale) VALUES ($1,$2,'applicant',$3)", [email, full_name || "", locale]);
+            uRes = await db_1.pool.query('SELECT id FROM users WHERE email=$1', [email]);
+        }
+        const applicantId = uRes.rows[0].id;
+        const appRes = await db_1.pool.query('INSERT INTO applications (applicant_id,status) VALUES ($1,$2) RETURNING id', [applicantId, 'in_progress']);
+        const appId = appRes.rows[0].id;
+        const docs = ['passport', 'us_address_proof', 'pay_stub', 'bank_statement', 'credit_auth', 'promesa_venta', 'nit', 'remittance_history'];
+        for (const dt of docs)
+            await db_1.pool.query('INSERT INTO documents (application_id,doc_type,status) VALUES ($1,$2,$3)', [appId, dt, 'pending']);
+        const raw = (0, crypto_1.randomBytes)(32).toString('hex');
+        const hash = (0, crypto_1.createHash)('sha256').update(raw).digest('hex');
+        const exp = new Date(Date.now() + 15 * 60 * 1000);
+        await db_1.pool.query('INSERT INTO auth_tokens (user_id,token_hash,expires_at) VALUES ($1,$2,$3)', [applicantId, hash, exp]);
+        await (0, mailer_1.sendApplicantWelcome)(email, raw, full_name || email, locale);
+        return res.json({ success: true, applicationId: appId });
     }
     catch (err) {
         console.error(err);

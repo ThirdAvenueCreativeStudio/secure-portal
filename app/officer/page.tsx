@@ -17,6 +17,11 @@ export default function OfficerDashboard() {
   const [docs, setDocs]       = useState<Doc[]>([]);
   const [loading, setLoading] = useState(true);
   const [section, setSection] = useState<'mine'|'unassigned'|'all'>('mine');
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteName, setInviteName] = useState('');
+  const [inviteMsg, setInviteMsg] = useState('');
+  const [inviting, setInviting] = useState(false);
 
   useEffect(() => {
     const u = localStorage.getItem('user');
@@ -52,6 +57,24 @@ export default function OfficerDashboard() {
 
   function logout() { localStorage.removeItem('user'); router.push('/'); }
 
+  async function inviteApplicant() {
+    if (!inviteEmail || !user) return;
+    setInviting(true); setInviteMsg('');
+    const r = await fetch(API+'/api/v1/officer/invite-applicant',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-user-id':user.id},
+      body:JSON.stringify({email:inviteEmail,full_name:inviteName,locale:'es'})
+    });
+    const d = await r.json();
+    if (d.success) {
+      setInviteMsg('Invitacion enviada a '+inviteEmail);
+      setInviteEmail(''); setInviteName('');
+      fetch(API+'/api/v1/officer/applications',{headers:{'x-user-id':user.id}}).then(r=>r.json()).then(d=>setApps(d.applications||[]));
+      setTimeout(()=>{setShowInvite(false);setInviteMsg('');},2500);
+    } else { setInviteMsg('Error: '+(d.error||'unknown')); }
+    setInviting(false);
+  }
+
   const mine       = apps.filter(a => a.assigned_to === user?.id);
   const unassigned = apps.filter(a => !a.assigned_to);
   const visible    = section === 'mine' ? mine : section === 'unassigned' ? unassigned : apps;
@@ -64,7 +87,10 @@ export default function OfficerDashboard() {
         <span style={{ color:'white', fontSize:'13px', fontWeight:500 }}>DocuHogar · Loan Officer</span>
         <div style={{ display:'flex', alignItems:'center', gap:16 }}>
           <span style={{ color:'rgba(255,255,255,0.6)', fontSize:'12px' }}>{user?.email}</span>
-          <button onClick={logout} style={{ background:'transparent', border:'none', color:'rgba(255,255,255,0.6)', cursor:'pointer', fontSize:'12px' }}>Logout</button>
+          <div style={{display:'flex',gap:12,alignItems:'center'}}>
+            <button onClick={()=>setShowInvite(true)} style={{background:'#C8973A',border:'none',color:'#0F2340',padding:'8px 16px',borderRadius:8,cursor:'pointer',fontSize:13,fontWeight:700}}>+ Nueva Solicitud</button>
+            <button onClick={logout} style={{background:'transparent',border:'none',color:'rgba(255,255,255,0.6)',cursor:'pointer',fontSize:12}}>Logout</button>
+          </div>
         </div>
       </nav>
 
@@ -164,6 +190,27 @@ export default function OfficerDashboard() {
           )}
         </div>
       </div>
+      {showInvite && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:999}}>
+          <div style={{background:'white',borderRadius:16,padding:32,width:440,boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:24}}>
+              <h3 style={{color:'#0F2340',fontSize:18,fontWeight:700}}>Nueva Solicitud</h3>
+              <button onClick={()=>{setShowInvite(false);setInviteMsg('');}} style={{border:'none',background:'none',cursor:'pointer',fontSize:20,color:'#999'}}>×</button>
+            </div>
+            <div style={{marginBottom:16}}>
+              <label style={{display:"block",fontSize:13,fontWeight:600,marginBottom:6}}>Email *</label>
+              <input value={inviteEmail} onChange={e=>setInviteEmail(e.target.value)} placeholder='email@banco.com' style={{width:'100%',padding:'10px',border:'1px solid #ddd',borderRadius:8,fontSize:14}} />
+            </div>
+            <div style={{marginBottom:24}}>
+              <label style={{display:"block",fontSize:13,fontWeight:600,marginBottom:6}}>Nombre</label>
+              <input value={inviteName} onChange={e=>setInviteName(e.target.value)} placeholder='Maria Garcia' style={{width:'100%',padding:'10px',border:'1px solid #ddd',borderRadius:8,fontSize:14}} />
+            </div>
+            <button onClick={inviteApplicant} disabled={inviting} style={{width:'100%',padding:'12px',background:'#0F2340',color:'white',border:'none',borderRadius:8,fontSize:15,fontWeight:600,cursor:'pointer'}}>{inviting?'Enviando...':'Enviar Invitacion'}</button>
+{inviteMsg&&<p style={{marginTop:16,textAlign:'center',fontWeight:500,color:inviteMsg.startsWith('Error')?'#c0392b':'#1a7a4a'}}>{inviteMsg}</p>}
+          </div>
+        </div>
+      )}
+
     </main>
   );
 }

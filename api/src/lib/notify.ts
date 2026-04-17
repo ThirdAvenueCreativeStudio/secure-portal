@@ -39,3 +39,15 @@ export async function notifyApplicantIdleReminder(o:{applicantEmail:string;appli
   const body='<h2>'+(es?'Documentos Pendientes':'Pending Documents')+'</h2><p>'+o.applicantName+(es?': documentos pendientes:':': pending docs:')+'</p><ul>'+items+'</ul><a href="'+APP_URL+'/dashboard" style="padding:12px 24px;background:#0F2340;color:white;border-radius:8px;text-decoration:none">'+(es?'Completar':'Complete')+'</a>';
   await resend.emails.send({from:FROM,to:o.applicantEmail,subject:subj,html:brand(body)});
 }
+
+export async function notifyApplicantWelcome(o:{applicantEmail:string;applicantName:string;token:string;locale?:string}) {
+  const es=o.locale!=='en';
+  const url=process.env.APP_URL+'/auth/verify?t='+o.token;
+  const subject=es?'Su expediente hipotecario — Acceso seguro':'Your mortgage file — Secure access';
+  const msg=es?'Hola <strong>'+o.applicantName+'</strong>, su oficial ha iniciado su expediente. Acceda al portal para cargar sus documentos.':'Hi <strong>'+o.applicantName+'</strong>, your loan officer has started your mortgage file. Please upload your documents.';
+  const cta=es?'Acceder a mi expediente':'Access my file';
+  const expire=es?'Este enlace expira en 15 minutos.':'This link expires in 15 minutes.';
+  await resend.emails.send({ from:FROM, to:o.applicantEmail, subject,
+    html:brand('<h2 style="color:#0F2340">'+( es?'Bienvenido':'Welcome')+'</h2><p>'+msg+'</p><a href="'+url+'" style="display:inline-block;margin-top:16px;padding:14px 28px;background:#0F2340;color:white;border-radius:8px;text-decoration:none;font-weight:600">'+cta+' &rarr;</a><p style="margin-top:16px;font-size:13px;color:#999">'+expire+'</p>'),
+  });
+}
