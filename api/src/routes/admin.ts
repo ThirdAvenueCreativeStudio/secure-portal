@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../lib/db';
 import { sendMagicLink } from '../lib/mailer';
+import { sendMonthlyBillingReport } from '../lib/billing';
 import { randomBytes, createHash } from 'crypto';
 const router = Router();
 
@@ -167,4 +168,17 @@ router.post('/invite-bank-admin', async (req: Request, res: Response) => {
     await pool.query('INSERT INTO audit_log (actor_id,action,entity_type,metadata) VALUES ($1,$2,$3,$4)',[userId,'bank_admin.invited','user',JSON.stringify({email,bank_id})]);
     return res.json({success:true});
   } catch(e){ console.error(e); return res.status(500).json({error:'Failed'}); }
+});
+
+router.post('/billing-report', async (req: Request, res: Response) => {
+  const cronSecret=req.headers['x-cron-secret'];
+  const validCron=cronSecret===process.env.CRON_SECRET;
+  if (!validCron) { const u=await requireAdmin(req,res); if (!u) return; }
+  const now=new Date();
+  const month=parseInt(req.body.month)||(now.getMonth()===0?12:now.getMonth());
+  const year=parseInt(req.body.year)||(month===12?now.getFullYear()-1:now.getFullYear());
+  try {
+    await sendMonthlyBillingReport(year,month);
+    return res.json({success:true,year,month});
+  } catch(e){console.error(e);return res.status(500).json({error:'Failed'});}
 });

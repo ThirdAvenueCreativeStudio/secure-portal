@@ -17,6 +17,8 @@ export default function AdminPage() {
   const [bankAdminName, setBankAdminName] = useState("");
   const [selectedBankId, setSelectedBankId] = useState("");
   const [bankMsg, setBankMsg] = useState("");
+  const [billingMsg, setBillingMsg] = useState("");
+  const [billingLoading, setBillingLoading] = useState(false);
   const [docs, setDocs] = useState<any[]>([]);
   const [pending, setPending] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
@@ -51,6 +53,18 @@ export default function AdminPage() {
     setApps(prev=>prev.map((a:any)=>a.id===appId?{...a,assigned_to:officerId,assigned_email:officers.find((o:any)=>o.id===officerId)?.email}:a));
   }
 
+  async function triggerBilling(month?:number, year?:number) {
+    if (!user) return;
+    setBillingLoading(true); setBillingMsg('');
+    const now=new Date();
+    const m=month||(now.getMonth()===0?12:now.getMonth());
+    const y=year||(m===12?now.getFullYear()-1:now.getFullYear());
+    const r=await fetch(API+"/api/v1/admin/billing-report",{method:"POST",headers:{"Content-Type":"application/json","x-user-id":user.id},body:JSON.stringify({month:m,year:y})});
+    const d=await r.json();
+    setBillingMsg(d.success?"Report sent for "+y+"-"+String(m).padStart(2,"0"):"Error: "+(d.error||"unknown"));
+    setBillingLoading(false);
+  }
+
   async function createBank() {
     if (!newBankName||!user) return;
     const r=await fetch(API+'/api/v1/admin/banks',{method:'POST',headers:{'Content-Type':'application/json','x-user-id':user.id},body:JSON.stringify({name:newBankName,contact_email:newBankEmail})});
@@ -77,7 +91,7 @@ export default function AdminPage() {
 
   if (!user) return <main style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "sans-serif" }}>Loading...</main>;
 
-  const TABS = [{ id: "stats", label: "Dashboard" },{ id: "applications", label: "Applications" },{ id: "documents", label: "Documents" },{ id: "users", label: "Users" },{ id: "pending", label: "Pending Review" },{ id: "audit", label: "Audit Log" },{ id: "invite", label: "Invite Officer" },{ id: "banks", label: "Banks" }];
+  const TABS = [{ id: "stats", label: "Dashboard" },{ id: "applications", label: "Applications" },{ id: "documents", label: "Documents" },{ id: "users", label: "Users" },{ id: "pending", label: "Pending Review" },{ id: "audit", label: "Audit Log" },{ id: "invite", label: "Invite Officer" },{ id: "banks", label: "Banks" },{ id: "billing", label: "Billing" }];
   return (
     <main style={{ fontFamily:"sans-serif", background:"#F4F7FB", minHeight:"100vh" }}>
       <div style={{ background:NAVY, color:"white", padding:"16px 32px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
@@ -188,6 +202,16 @@ export default function AdminPage() {
 <table style={{width:"100%",borderCollapse:"collapse",background:"white"}}><thead><tr><th style={{padding:"12px",textAlign:"left"}}>Banco</th><th style={{padding:"12px",textAlign:"left"}}>Oficiales</th></tr></thead>
 <tbody>{banks.map((b:any)=>(<tr key={b.id} style={{borderTop:"1px solid #eee"}}><td style={{padding:"12px",fontWeight:600}}>{b.name}</td><td style={{padding:"12px"}}>{b.officer_count}</td></tr>))}</tbody></table></div>
 {bankMsg&&<p style={{marginTop:16,fontWeight:500,color:bankMsg.startsWith("Error")?"#c0392b":"#1a7a4a"}}>{bankMsg}</p>}
+        </div>)}
+        {tab==="billing" && (<div>
+          <h2 style={{color:NAVY,marginBottom:8}}>Billing Reports</h2>
+          <p style={{color:"#666",fontSize:13,marginBottom:24}}>Runs automatically on the 1st of each month.</p>
+          <div style={{background:"white",padding:32,borderRadius:12,maxWidth:520,boxShadow:"0 1px 4px rgba(0,0,0,0.07)"}}>
+            <h3 style={{marginBottom:16,color:NAVY}}>Trigger Monthly Report</h3>
+            <p style={{fontSize:13,color:"#666",marginBottom:20}}>Sends your summary + PDF invoices to each bank for last month.</p>
+            <button onClick={()=>triggerBilling()} disabled={billingLoading} style={{padding:"12px 24px",background:NAVY,color:"white",border:"none",borderRadius:8,fontWeight:600,cursor:"pointer"}}>{billingLoading?"Sending...":"Send Last Month Report"}</button>
+{billingMsg&&<p style={{marginTop:16,fontWeight:500,color:billingMsg.startsWith("Error")?"#c0392b":"#1a7a4a"}}>{billingMsg}</p>}
+          </div>
         </div>)}
         {tab==="invite" && (<div>
           <h2 style={{color:NAVY,marginBottom:24}}>Invite Officer</h2>

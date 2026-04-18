@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const db_1 = require("../lib/db");
 const mailer_1 = require("../lib/mailer");
+const billing_1 = require("../lib/billing");
 const crypto_1 = require("crypto");
 const router = (0, express_1.Router)();
 async function requireAdmin(req, res) {
@@ -230,6 +231,26 @@ router.post('/invite-bank-admin', async (req, res) => {
         await (0, mailer_1.sendMagicLink)(email, raw, 'es');
         await db_1.pool.query('INSERT INTO audit_log (actor_id,action,entity_type,metadata) VALUES ($1,$2,$3,$4)', [userId, 'bank_admin.invited', 'user', JSON.stringify({ email, bank_id })]);
         return res.json({ success: true });
+    }
+    catch (e) {
+        console.error(e);
+        return res.status(500).json({ error: 'Failed' });
+    }
+});
+router.post('/billing-report', async (req, res) => {
+    const cronSecret = req.headers['x-cron-secret'];
+    const validCron = cronSecret === process.env.CRON_SECRET;
+    if (!validCron) {
+        const u = await requireAdmin(req, res);
+        if (!u)
+            return;
+    }
+    const now = new Date();
+    const month = parseInt(req.body.month) || (now.getMonth() === 0 ? 12 : now.getMonth());
+    const year = parseInt(req.body.year) || (month === 12 ? now.getFullYear() - 1 : now.getFullYear());
+    try {
+        await (0, billing_1.sendMonthlyBillingReport)(year, month);
+        return res.json({ success: true, year, month });
     }
     catch (e) {
         console.error(e);
