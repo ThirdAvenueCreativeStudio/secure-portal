@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const db_1 = require("../lib/db");
+const checklist_1 = require("../lib/checklist");
 const mailer_1 = require("../lib/mailer");
 const crypto_1 = require("crypto");
 const router = (0, express_1.Router)();
@@ -114,6 +115,41 @@ router.get('/officer-workload', async (req, res) => {
         return res.json({ officers: r.rows });
     }
     catch (e) {
+        return res.status(500).json({ error: 'Failed' });
+    }
+});
+// GET /bank-admin/checklist
+router.get('/checklist', async (req, res) => {
+    const auth = await requireBankAdmin(req, res);
+    if (!auth)
+        return;
+    try {
+        const r = await db_1.pool.query('SELECT * FROM bank_checklists WHERE bank_id=$1 ORDER BY sort_order', [auth.bankId]);
+        const checklist = r.rows.length ? r.rows : checklist_1.DEFAULT_CHECKLIST.map((d, i) => ({ ...d, bank_id: auth.bankId, sort_order: i }));
+        return res.json({ checklist });
+    }
+    catch (e) {
+        return res.status(500).json({ error: 'Failed' });
+    }
+});
+// PUT /bank-admin/checklist
+router.put('/checklist', async (req, res) => {
+    const auth = await requireBankAdmin(req, res);
+    if (!auth)
+        return;
+    const { checklist } = req.body;
+    if (!Array.isArray(checklist))
+        return res.status(400).json({ error: 'array required' });
+    try {
+        await db_1.pool.query('DELETE FROM bank_checklists WHERE bank_id=$1', [auth.bankId]);
+        for (let i = 0; i < checklist.length; i++) {
+            const { doc_type, label_es, label_en, required } = checklist[i];
+            await db_1.pool.query('INSERT INTO bank_checklists (bank_id,doc_type,label_es,label_en,required,sort_order) VALUES ($1,$2,$3,$4,$5,$6)', [auth.bankId, doc_type, label_es, label_en, required !== false, i]);
+        }
+        return res.json({ success: true });
+    }
+    catch (e) {
+        console.error(e);
         return res.status(500).json({ error: 'Failed' });
     }
 });

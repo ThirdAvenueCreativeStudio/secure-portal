@@ -14,6 +14,8 @@ export default function BankAdminPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteName, setInviteName] = useState("");
   const [msg, setMsg] = useState("");
+  const [checklist, setChecklist] = useState<any[]>([]);
+  const [checklistMsg, setChecklistMsg] = useState("");
 
   useEffect(() => {
     const stored = localStorage.getItem("user");
@@ -44,6 +46,17 @@ export default function BankAdminPage() {
     if (d.success) { setInviteEmail(""); setInviteName(""); }
   }
 
+  async function saveChecklist() {
+    if (!user) return;
+    const r=await fetch(API+"/api/v1/bank-admin/checklist",{
+      method:"PUT",headers:{"Content-Type":"application/json","x-user-id":user.id},
+      body:JSON.stringify({checklist})
+    });
+    const d=await r.json();
+    setChecklistMsg(d.success?"Checklist guardado correctamente":"Error: "+(d.error||"unknown"));
+    setTimeout(()=>setChecklistMsg(""),3000);
+  }
+
   function logout() { localStorage.removeItem("user"); window.location.href = "/"; }
 
   if (!user) return <main style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100vh", fontFamily:"sans-serif" }}>Loading...</main>;
@@ -53,6 +66,7 @@ export default function BankAdminPage() {
     { id: "applications", label: "Expedientes" },
     { id: "team", label: "Mi Equipo" },
     { id: "invite", label: "Invitar Oficial" },
+    { id: "checklist", label: "Checklist" },
   ];
 
   const statusColor: Record<string,string> = { approved:"#1a7a4a", rejected:"#c0392b", in_progress:"#185FA5" };
@@ -221,6 +235,32 @@ export default function BankAdminPage() {
           </div>
         )}
 
+        {tab==="checklist" && (
+          <div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
+              <h2 style={{color:NAVY}}>Checklist de Documentos</h2>
+              <button onClick={saveChecklist} style={{padding:"10px 24px",background:NAVY,color:"white",border:"none",borderRadius:8,fontWeight:600,cursor:"pointer"}}>Guardar Cambios</button>
+            </div>
+            <p style={{color:"#666",fontSize:13,marginBottom:24}}>Configure los documentos requeridos para nuevos expedientes en su institución.</p>
+            <div style={{background:"white",borderRadius:12,overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.07)"}}>
+              <table style={{width:"100%",borderCollapse:"collapse"}}>
+                <thead><tr style={{background:"#F4F7FB"}}>
+                  <th style={{padding:"12px 16px",textAlign:"left",fontSize:12}}>Documento</th>
+                  <th style={{padding:"12px 16px",textAlign:"left",fontSize:12}}>Etiqueta ES</th>
+                  <th style={{padding:"12px 16px",textAlign:"left",fontSize:12}}>Etiqueta EN</th>
+                  <th style={{padding:"12px 16px",textAlign:"center",fontSize:12}}>Requerido</th>
+                </tr></thead>
+                <tbody>{checklist.map((doc:any,i:number)=>(<tr key={doc.doc_type} style={{borderTop:"1px solid #f0f0f0"}}>
+                  <td style={{padding:"12px 16px",fontSize:13,color:"#999",fontFamily:"monospace"}}>{doc.doc_type}</td>
+                  <td style={{padding:"8px 16px"}}><input value={doc.label_es||""} onChange={e=>{const c2=[...checklist];c2[i]={...c2[i],label_es:e.target.value};setChecklist(c2);}} style={{width:"100%",padding:"6px 8px",border:"1px solid #ddd",borderRadius:6,fontSize:13}} /></td>
+                  <td style={{padding:"8px 16px"}}><input value={doc.label_en||""} onChange={e=>{const c2=[...checklist];c2[i]={...c2[i],label_en:e.target.value};setChecklist(c2);}} style={{width:"100%",padding:"6px 8px",border:"1px solid #ddd",borderRadius:6,fontSize:13}} /></td>
+                  <td style={{padding:"8px 16px",textAlign:"center"}}><input type="checkbox" checked={doc.required!==false} onChange={e=>{const c2=[...checklist];c2[i]={...c2[i],required:e.target.checked};setChecklist(c2);}} /></td>
+                </tr>))}</tbody>
+              </table>
+            </div>
+{checklistMsg&&<p style={{marginTop:16,fontWeight:500,color:checklistMsg.startsWith("Error")?"#c0392b":"#1a7a4a"}}>{checklistMsg}</p>}
+          </div>
+        )}
       </div>
     </main>
   );

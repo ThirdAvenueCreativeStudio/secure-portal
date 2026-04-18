@@ -3,6 +3,7 @@ import { pool } from '../lib/db';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { notifyApplicantDocApproved, notifyApplicantDocRejected, notifyApplicantIdleReminder } from '../lib/notify';
 import { sendApplicantWelcome } from '../lib/mailer';
+import { getBankChecklist } from '../lib/checklist';
 import { randomBytes, createDecipheriv, createHash } from 'crypto';
 const router = Router();
 
@@ -167,8 +168,11 @@ router.post('/invite-applicant', async (req, res) => {
     const applicantId=uRes.rows[0].id;
     const appRes=await pool.query('INSERT INTO applications (applicant_id,status) VALUES ($1,$2) RETURNING id',[applicantId,'in_progress']);
     const appId=appRes.rows[0].id;
-    const docs=['passport','us_address_proof','pay_stub','bank_statement','credit_auth','promesa_venta','nit','remittance_history'];
-    for (const dt of docs) await pool.query('INSERT INTO documents (application_id,doc_type,status) VALUES ($1,$2,$3)',[appId,dt,'pending']);
+    // Get bank's custom checklist or fall back to default
+    const officer2=await pool.query('SELECT bank_id FROM users WHERE id=$1',[userId]);
+    const bankId=officer2.rows[0]?.bank_id||null;
+    const docTypes=await getBankChecklist(pool,bankId);
+    for (const dt of docTypes) await pool.query('INSERT INTO documents (application_id,doc_type,status) VALUES ($1,$2,$3)',[appId,dt,'pending']);
     const raw=randomBytes(32).toString('hex');
     const hash=createHash('sha256').update(raw).digest('hex');
     const exp=new Date(Date.now()+15*60*1000);

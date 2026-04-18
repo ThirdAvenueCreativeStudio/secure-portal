@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../lib/db';
+import { DEFAULT_CHECKLIST } from '../lib/checklist';
 import { sendMagicLink } from '../lib/mailer';
 import { randomBytes, createHash } from 'crypto';
 const router = Router();
@@ -87,4 +88,29 @@ router.get('/officer-workload', async (req: Request, res: Response) => {
     const r=await pool.query("SELECT u.id,u.email,u.full_name,COUNT(a.id) as total,COUNT(CASE WHEN a.status='in_progress' THEN 1 END) as active FROM users u LEFT JOIN applications a ON a.assigned_to=u.id WHERE u.bank_id=$1 AND u.role='officer' GROUP BY u.id ORDER BY u.full_name",[auth.bankId]);
     return res.json({officers:r.rows});
   } catch(e){return res.status(500).json({error:'Failed'});}
+});
+
+// GET /bank-admin/checklist
+router.get('/checklist', async (req: Request, res: Response) => {
+  const auth=await requireBankAdmin(req,res); if (!auth) return;
+  try {
+    const r=await pool.query('SELECT * FROM bank_checklists WHERE bank_id=$1 ORDER BY sort_order',[auth.bankId]);
+    const checklist = r.rows.length ? r.rows : DEFAULT_CHECKLIST.map((d,i)=>({...d,bank_id:auth.bankId,sort_order:i}));
+    return res.json({checklist});
+  } catch(e){return res.status(500).json({error:'Failed'});}
+});
+
+// PUT /bank-admin/checklist
+router.put('/checklist', async (req: Request, res: Response) => {
+  const auth=await requireBankAdmin(req,res); if (!auth) return;
+  const {checklist}=req.body;
+  if (!Array.isArray(checklist)) return res.status(400).json({error:'array required'});
+  try {
+    await pool.query('DELETE FROM bank_checklists WHERE bank_id=$1',[auth.bankId]);
+    for (let i=0;i<checklist.length;i++) {
+      const {doc_type,label_es,label_en,required}=checklist[i];
+      await pool.query('INSERT INTO bank_checklists (bank_id,doc_type,label_es,label_en,required,sort_order) VALUES ($1,$2,$3,$4,$5,$6)',[auth.bankId,doc_type,label_es,label_en,required!==false,i]);
+    }
+    return res.json({success:true});
+  } catch(e){console.error(e);return res.status(500).json({error:'Failed'});}
 });

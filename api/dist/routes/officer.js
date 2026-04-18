@@ -5,6 +5,7 @@ const db_1 = require("../lib/db");
 const client_s3_1 = require("@aws-sdk/client-s3");
 const notify_1 = require("../lib/notify");
 const mailer_1 = require("../lib/mailer");
+const checklist_1 = require("../lib/checklist");
 const crypto_1 = require("crypto");
 const router = (0, express_1.Router)();
 async function requireOfficer(req, res) {
@@ -209,8 +210,11 @@ router.post('/invite-applicant', async (req, res) => {
         const applicantId = uRes.rows[0].id;
         const appRes = await db_1.pool.query('INSERT INTO applications (applicant_id,status) VALUES ($1,$2) RETURNING id', [applicantId, 'in_progress']);
         const appId = appRes.rows[0].id;
-        const docs = ['passport', 'us_address_proof', 'pay_stub', 'bank_statement', 'credit_auth', 'promesa_venta', 'nit', 'remittance_history'];
-        for (const dt of docs)
+        // Get bank's custom checklist or fall back to default
+        const officer2 = await db_1.pool.query('SELECT bank_id FROM users WHERE id=$1', [userId]);
+        const bankId = officer2.rows[0]?.bank_id || null;
+        const docTypes = await (0, checklist_1.getBankChecklist)(db_1.pool, bankId);
+        for (const dt of docTypes)
             await db_1.pool.query('INSERT INTO documents (application_id,doc_type,status) VALUES ($1,$2,$3)', [appId, dt, 'pending']);
         const raw = (0, crypto_1.randomBytes)(32).toString('hex');
         const hash = (0, crypto_1.createHash)('sha256').update(raw).digest('hex');
