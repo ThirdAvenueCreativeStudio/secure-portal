@@ -78,3 +78,42 @@ router.post('/invite-officer', async (req, res) => {
     }
 });
 exports.default = router;
+// GET /bank-admin/applications
+router.get('/applications', async (req, res) => {
+    const auth = await requireBankAdmin(req, res);
+    if (!auth)
+        return;
+    try {
+        const apps = await db_1.pool.query(`
+      SELECT a.id,a.status,a.updated_at,
+        u.email,u.full_name,
+        ou.full_name as assigned_name,
+        COUNT(d.id) as total_docs,
+        COUNT(CASE WHEN d.status='approved' THEN 1 END) as approved_docs
+      FROM applications a
+      JOIN users u ON u.id=a.applicant_id
+      LEFT JOIN users ou ON ou.id=a.assigned_to
+      LEFT JOIN documents d ON d.application_id=a.id
+      WHERE u.bank_id=$1
+      GROUP BY a.id,u.email,u.full_name,ou.full_name
+      ORDER BY a.updated_at DESC
+    `, [auth.bankId]);
+        return res.json({ applications: apps.rows });
+    }
+    catch (e) {
+        return res.status(500).json({ error: 'Failed' });
+    }
+});
+// GET /bank-admin/officer-workload
+router.get('/officer-workload', async (req, res) => {
+    const auth = await requireBankAdmin(req, res);
+    if (!auth)
+        return;
+    try {
+        const r = await db_1.pool.query("SELECT u.id,u.email,u.full_name,COUNT(a.id) as total,COUNT(CASE WHEN a.status='in_progress' THEN 1 END) as active FROM users u LEFT JOIN applications a ON a.assigned_to=u.id WHERE u.bank_id=$1 AND u.role='officer' GROUP BY u.id ORDER BY u.full_name", [auth.bankId]);
+        return res.json({ officers: r.rows });
+    }
+    catch (e) {
+        return res.status(500).json({ error: 'Failed' });
+    }
+});
