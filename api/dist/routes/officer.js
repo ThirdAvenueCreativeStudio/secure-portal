@@ -25,8 +25,14 @@ router.get('/applications', async (req, res) => {
     if (!userId)
         return;
     try {
+        const officer = await db_1.pool.query('SELECT bank_id,role FROM users WHERE id=$1', [userId]);
+        const bankId = officer.rows[0]?.bank_id;
+        const isGlobalAdmin = officer.rows[0]?.role === 'admin';
+        const hasBank = !isGlobalAdmin && bankId;
+        const bankFilter = hasBank ? "AND u.bank_id=$1" : '';
+        const params = hasBank ? [bankId] : [];
         const apps = await db_1.pool.query(`
-      SELECT a.id, a.status, a.created_at, a.updated_at, a.loan_amount_usd, a.property_address,
+      SELECT a.id, a.status, a.created_at, a.updated_at,
         a.assigned_to, u.email, u.full_name, u.phone,
         ou.email as assigned_email, ou.full_name as assigned_name,
         COUNT(d.id) as total_docs,
@@ -35,9 +41,10 @@ router.get('/applications', async (req, res) => {
       JOIN users u ON u.id=a.applicant_id
       LEFT JOIN users ou ON ou.id=a.assigned_to
       LEFT JOIN documents d ON d.application_id=a.id
+      WHERE 1=1 ${bankFilter}
       GROUP BY a.id, u.email, u.full_name, u.phone, ou.email, ou.full_name
       ORDER BY a.updated_at DESC
-    `);
+    `, params);
         return res.json({ applications: apps.rows });
     }
     catch (err) {

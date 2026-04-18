@@ -18,7 +18,7 @@ async function requireBankAdmin(req: Request, res: Response): Promise<{userId:st
 router.get('/team', async (req: Request, res: Response) => {
   const auth = await requireBankAdmin(req, res); if (!auth) return;
   try {
-    const users = await pool.query('SELECT id,email,full_name,role,created_at FROM users WHERE bank_id=$1 AND role IN ($2,$3) ORDER BY created_at DESC',[ auth.bankId,'officer','bank_admin']);
+    const users = await pool.query("SELECT id,email,full_name,role,created_at FROM users WHERE bank_id=$1 AND role='officer' ORDER BY created_at DESC",[auth.bankId]);
     return res.json({ users: users.rows });
   } catch(err){ console.error(err); return res.status(500).json({ error:'Failed' }); }
 });
@@ -28,7 +28,7 @@ router.get('/stats', async (req: Request, res: Response) => {
   const auth = await requireBankAdmin(req, res); if (!auth) return;
   try {
     const apps = await pool.query('SELECT COUNT(*) FROM applications WHERE applicant_id IN (SELECT id FROM users WHERE bank_id=$1)',[auth.bankId]);
-    const officers = await pool.query("SELECT COUNT(*) FROM users WHERE bank_id=$1 AND role IN ('officer','bank_admin')",[auth.bankId]);
+    const officers = await pool.query("SELECT COUNT(*) FROM users WHERE bank_id=$1 AND role='officer'",[auth.bankId]);
     return res.json({ applications:parseInt(apps.rows[0].count), officers:parseInt(officers.rows[0].count) });
   } catch(err){ console.error(err); return res.status(500).json({ error:'Failed' }); }
 });
