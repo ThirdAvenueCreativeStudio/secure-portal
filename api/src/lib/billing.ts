@@ -30,7 +30,7 @@ export async function getBillingData(year:number, month:number): Promise<BankRep
   return reports;
 }
 
-function generateInvoicePDF(bank: any, month: string, invoiceNum: string): Promise<Buffer> {
+export function generateInvoicePDF(bank: any, month: string, invoiceNum: string): Promise<Buffer> {
   return new Promise((resolve) => {
     const doc = new PDFDocument({margin:50});
     const chunks:Buffer[] = [];

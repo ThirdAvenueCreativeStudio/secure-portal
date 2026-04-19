@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getBillingData = getBillingData;
+exports.generateInvoicePDF = generateInvoicePDF;
 exports.sendMonthlyBillingReport = sendMonthlyBillingReport;
 const pdfkit_1 = __importDefault(require("pdfkit"));
 const resend_1 = require("resend");
