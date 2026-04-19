@@ -30,7 +30,7 @@ async function getBillingData(year, month) {
     }
     return reports;
 }
-function generateInvoicePDF(bank, month, invoiceNum) {
+function generateInvoicePDF(bank, month, invoiceNum, applications) {
     return new Promise((resolve) => {
         const doc = new pdfkit_1.default({ margin: 50 });
         const chunks = [];
@@ -69,13 +69,21 @@ function generateInvoicePDF(bank, month, invoiceNum) {
         doc.moveDown(0.3);
         doc.moveTo(50, doc.y).lineTo(562, doc.y).strokeColor('#ddd').stroke();
         doc.moveDown(0.5);
-        doc.fontSize(10).fillColor('#333');
-        doc.text('Expedientes completados — ' + month, 50, doc.y, { width: 300 });
-        doc.text(String(bank.completed), 350, doc.y - doc.currentLineHeight(), { width: 60, align: 'center' });
-        doc.text('$75.00', 410, doc.y - doc.currentLineHeight(), { width: 80, align: 'right' });
-        doc.text('$' + bank.total.toFixed(2), 490, doc.y - doc.currentLineHeight(), { width: 70, align: 'right' });
-        doc.moveDown(1.5);
-        doc.fontSize(13).fillColor('#0F2340').text('Total Due: $' + bank.total.toFixed(2), { align: 'right' });
+        doc.fontSize(10).fillColor("#333");
+        applications.forEach((app, i) => {
+            const name = app.full_name || app.email || "N/A";
+            const dt = new Date(app.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+            const rowY = doc.y;
+            doc.text(String(i + 1) + ".", 50, rowY, { width: 25 });
+            doc.text(name, 75, rowY, { width: 250 });
+            doc.text(dt, 325, rowY, { width: 140 });
+            doc.text("$75.00", 490, rowY, { width: 70, align: "right" });
+            doc.moveDown(0.7);
+            doc.moveTo(50, doc.y).lineTo(562, doc.y).strokeColor("#f0f0f0").stroke();
+            doc.moveDown(0.3);
+        });
+        doc.moveDown(0.5);
+        doc.fontSize(13).fillColor("#0F2340").text("Total Due: $" + bank.total.toFixed(2), { align: "right" });
         doc.moveDown(2);
         doc.moveTo(50, doc.y).lineTo(562, doc.y).strokeColor('#ddd').stroke();
         doc.moveDown(0.5);
@@ -108,9 +116,13 @@ async function sendMonthlyBillingReport(year, month) {
         if (!r.contactEmail || r.completed === 0)
             continue;
         const num = year + '-' + String(month).padStart(2, '0') + '-' + String(i + 1).padStart(3, '0');
-        const pdf = await generateInvoicePDF(r, monthName, num);
+        // Fetch individual applications for this bank this month
+        const appRows = await db_1.pool.query("SELECT a.id,u.full_name,u.email,a.updated_at FROM applications a JOIN users u ON u.id=a.applicant_id WHERE u.bank_id=$1 AND a.status='submitted' AND a.updated_at>=$2 AND a.updated_at<$3 ORDER BY a.updated_at", [r.bankId, new Date(year, month - 1, 1), new Date(year, month, 1)]);
+        const pdf = await generateInvoicePDF(r, monthName, num, appRows.rows);
         const body = '<p>Estimado equipo de ' + r.bankName + ',</p><p>Adjunto la factura para ' + monthName + '. Total: $' + r.total.toFixed(2) + '</p><p>Pago via ACH wire transfer en 30 dias.</p><p>DocuHogar — info@docuhogar.com</p>';
         await resend.emails.send({ from: FROM, to: r.contactEmail, subject: 'DocuHogar Factura ' + monthName, html: body, attachments: [{ filename: 'Factura-' + num + '.pdf', content: pdf }] });
     }
+    // Log to audit_log
+    await db_1.pool.query("INSERT INTO audit_log (action,entity_type,metadata) VALUES ($1,$2,$3)", ['billing.report_sent', 'billing', JSON.stringify({ month, year, banks: reports.length, total: totalRevenue })]);
     console.log('Billing done for ' + monthName + ', total $' + totalRevenue.toFixed(2));
 }
