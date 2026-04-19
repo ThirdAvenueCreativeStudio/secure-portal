@@ -62,10 +62,11 @@ function generateInvoicePDF(bank, month, invoiceNum, applications) {
         doc.moveTo(50, doc.y).lineTo(562, doc.y).strokeColor('#ddd').stroke();
         doc.moveDown(0.3);
         doc.fontSize(10).fillColor('#666');
-        doc.text('Description', 50, doc.y, { width: 300 });
-        doc.text('Qty', 350, doc.y - doc.currentLineHeight(), { width: 60, align: 'center' });
-        doc.text('Unit Price', 410, doc.y - doc.currentLineHeight(), { width: 80, align: 'right' });
-        doc.text('Total', 490, doc.y - doc.currentLineHeight(), { width: 70, align: 'right' });
+        const hY = doc.y;
+        doc.text('#', 50, hY, { width: 25 });
+        doc.text('Solicitante', 75, hY, { width: 250 });
+        doc.text('Fecha completado', 325, hY, { width: 140 });
+        doc.text('Monto', 490, hY, { width: 70, align: 'right' });
         doc.moveDown(0.3);
         doc.moveTo(50, doc.y).lineTo(562, doc.y).strokeColor('#ddd').stroke();
         doc.moveDown(0.5);
@@ -87,8 +88,8 @@ function generateInvoicePDF(bank, month, invoiceNum, applications) {
         doc.moveDown(2);
         doc.moveTo(50, doc.y).lineTo(562, doc.y).strokeColor('#ddd').stroke();
         doc.moveDown(0.5);
-        doc.fontSize(10).fillColor('#666').text('Payment via ACH wire transfer to 3rd Avenue Creative Studio, LLC');
-        doc.text('Questions: info@docuhogar.com');
+        doc.fontSize(10).fillColor('#666').text('Payment via ACH wire transfer to 3rd Avenue Creative Studio, LLC', { align: 'center' });
+        doc.text('Questions: info@docuhogar.com', { align: 'center' });
         doc.end();
     });
 }
