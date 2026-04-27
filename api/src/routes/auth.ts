@@ -26,7 +26,7 @@ router.post('/request', async (req: Request, res: Response) => {
     const exp = new Date(Date.now() + 15*60*1000);
     await pool.query('INSERT INTO auth_tokens (user_id,token_hash,expires_at) VALUES ($1,$2,$3)', [userId,hash,exp]);
     await sendMagicLink(email, raw, locale);
-    await pool.query("INSERT INTO audit_log (actor_id,action,entity_type,entity_id,bank_id,metadata) VALUES ($1,'auth.requested','user',$1,bankId,$2)", [userId, JSON.stringify({ip:req.ip})]);
+    await pool.query("INSERT INTO audit_log (actor_id,action,entity_type,entity_id,bank_id,metadata) VALUES ($1,'auth.requested','user',$1,$2,$3)", [userId, bankId, JSON.stringify({ip:req.ip})]);
     return res.json({ success: true });
   } catch(err) { console.error(err); return res.status(500).json({ error: 'Failed to send magic link' }); }
 });
@@ -44,7 +44,7 @@ router.get('/verify', async (req: Request, res: Response) => {
     if (t.used_at) return res.status(401).json({ error: 'Token already used' });
     if (new Date(t.expires_at) < new Date()) return res.status(401).json({ error: 'Token expired' });
     await pool.query('UPDATE auth_tokens SET used_at=NOW() WHERE id=$1', [t.id]);
-    await pool.query("INSERT INTO audit_log (actor_id,action,entity_type,entity_id,bank_id,metadata) VALUES ($1,'auth.login','user',$1,t.bank_id||null,$2)", [t.user_id, JSON.stringify({ip:req.ip})]);
+    await pool.query("INSERT INTO audit_log (actor_id,action,entity_type,entity_id,bank_id,metadata) VALUES ($1,'auth.login','user',$1,$2,$3)", [t.user_id, t.bank_id||null, JSON.stringify({ip:req.ip})]);
     res.cookie('session', t.user_id, { httpOnly:true, secure:process.env.NODE_ENV==='production', sameSite:'strict', maxAge:8*60*60*1000 });
     return res.json({ success:true, user:{ id:t.user_id, email:t.email, role:t.role, locale:t.locale } });
   } catch(err) { console.error(err); return res.status(500).json({ error: 'Verification failed' }); }
