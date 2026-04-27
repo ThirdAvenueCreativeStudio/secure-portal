@@ -16,16 +16,17 @@ router.post('/request', async (req: Request, res: Response) => {
     );
     if (parseInt(rate.rows[0].count) >= 3) return res.status(429).json({ error: 'Too many requests' });
     const user = await pool.query(
-      "INSERT INTO users (email,role,locale) VALUES ($1,'applicant',$2) ON CONFLICT (email) DO UPDATE SET locale=$2 RETURNING id",
+      "INSERT INTO users (email,role,locale) VALUES ($1,'applicant',$2) ON CONFLICT (email) DO UPDATE SET locale=$2 RETURNING id,bank_id",
       [email, locale]
     );
     const userId = user.rows[0].id;
+    const bankId = user.rows[0].bank_id || null;
     const raw = randomBytes(32).toString('hex');
     const hash = createHash('sha256').update(raw).digest('hex');
     const exp = new Date(Date.now() + 15*60*1000);
     await pool.query('INSERT INTO auth_tokens (user_id,token_hash,expires_at) VALUES ($1,$2,$3)', [userId,hash,exp]);
     await sendMagicLink(email, raw, locale);
-    await pool.query("INSERT INTO audit_log (actor_id,action,entity_type,entity_id,metadata) VALUES ($1,'auth.requested','user',$1,$2)", [userId, JSON.stringify({ip:req.ip})]);
+    await pool.query("INSERT INTO audit_log (actor_id,action,entity_type,entity_id,bank_id,metadata) VALUES ($1,'auth.requested','user',$1,bankId,$2)", [userId, JSON.stringify({ip:req.ip})]);
     return res.json({ success: true });
   } catch(err) { console.error(err); return res.status(500).json({ error: 'Failed to send magic link' }); }
 });
@@ -35,7 +36,7 @@ router.get('/verify', async (req: Request, res: Response) => {
   try {
     const hash = createHash('sha256').update(raw).digest('hex');
     const result = await pool.query(
-      'SELECT at.id,at.user_id,at.expires_at,at.used_at,u.email,u.role,u.locale FROM auth_tokens at JOIN users u ON u.id=at.user_id WHERE at.token_hash=$1',
+      'SELECT at.id,at.user_id,at.expires_at,at.used_at,u.email,u.role,u.locale,u.bank_id FROM auth_tokens at JOIN users u ON u.id=at.user_id WHERE at.token_hash=$1',
       [hash]
     );
     if (!result.rows.length) return res.status(401).json({ error: 'Invalid token' });
@@ -43,14 +44,14 @@ router.get('/verify', async (req: Request, res: Response) => {
     if (t.used_at) return res.status(401).json({ error: 'Token already used' });
     if (new Date(t.expires_at) < new Date()) return res.status(401).json({ error: 'Token expired' });
     await pool.query('UPDATE auth_tokens SET used_at=NOW() WHERE id=$1', [t.id]);
-    await pool.query("INSERT INTO audit_log (actor_id,action,entity_type,entity_id,metadata) VALUES ($1,'auth.login','user',$1,$2)", [t.user_id, JSON.stringify({ip:req.ip})]);
+    await pool.query("INSERT INTO audit_log (actor_id,action,entity_type,entity_id,bank_id,metadata) VALUES ($1,'auth.login','user',$1,t.bank_id||null,$2)", [t.user_id, JSON.stringify({ip:req.ip})]);
     res.cookie('session', t.user_id, { httpOnly:true, secure:process.env.NODE_ENV==='production', sameSite:'strict', maxAge:8*60*60*1000 });
     return res.json({ success:true, user:{ id:t.user_id, email:t.email, role:t.role, locale:t.locale } });
   } catch(err) { console.error(err); return res.status(500).json({ error: 'Verification failed' }); }
 });
 router.post('/logout', async (req: Request, res: Response) => {
   const userId = req.cookies?.session || req.headers['x-user-id'] as string;
-  if (userId) await pool.query("INSERT INTO audit_log (actor_id,action,entity_type,entity_id) VALUES ($1,'auth.logout','user',$1)", [userId]).catch(()=>{});
+  if (userId) { const ub=await pool.query('SELECT bank_id FROM users WHERE id=$1',[userId]).catch(()=>({rows:[]})); const bid=ub.rows[0]?.bank_id||null; await pool.query("INSERT INTO audit_log (actor_id,action,entity_type,entity_id,bank_id) VALUES ($1,'auth.logout','user',$1,$2)", [userId,bid]).catch(()=>{}); }
   res.clearCookie('session');
   return res.json({ success: true });
 });

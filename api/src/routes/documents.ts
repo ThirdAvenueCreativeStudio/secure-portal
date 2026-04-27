@@ -48,10 +48,11 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
       Metadata: { iv: iv.toString('hex'), key: key.toString('hex'), originalMime: req.file.mimetype },
     }));
     const appResult = await pool.query(
-      'SELECT id FROM applications WHERE applicant_id=$1 ORDER BY created_at DESC LIMIT 1',
+      'SELECT id,bank_id FROM applications WHERE applicant_id=$1 ORDER BY created_at DESC LIMIT 1',
       [userId]
     );
-    let applicationId;
+    let applicationId: string;
+    let bankId: string | null = null;
     if (appResult.rows.length === 0) {
       const newApp = await pool.query(
         'INSERT INTO applications (applicant_id,status) VALUES ($1,$2) RETURNING id',
@@ -60,13 +61,14 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
       applicationId = newApp.rows[0].id;
     } else {
       applicationId = appResult.rows[0].id;
+      const bankId = appResult.rows[0].bank_id || null;
     }
     await pool.query(
       'INSERT INTO documents (application_id,doc_type,status,s3_key,s3_iv,original_filename,file_size_bytes,mime_type,uploaded_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW()) ON CONFLICT DO NOTHING',
       [applicationId, doc_type, 'uploaded', s3Key, iv.toString('hex'), req.file.originalname, req.file.size, req.file.mimetype]
     );
     await pool.query(
-      'INSERT INTO audit_log (actor_id,action,entity_type,metadata) VALUES ($1,$2,$3,$4)',
+      'INSERT INTO audit_log (actor_id,action,entity_type,bank_id,metadata) VALUES ($1,$2,$3,bankId,$4)',
       [userId, 'doc.uploaded', 'document', JSON.stringify({doc_type, size: req.file.size})]
     );
     // Notify officer — find any officer/admin for this bank (or globally)
@@ -89,7 +91,7 @@ router.get('/:id/view', async (req: Request, res: Response) => {
     const doc = await pool.query('SELECT * FROM documents WHERE id=$1', [req.params.id]);
     if (!doc.rows.length) return res.status(404).json({ error: 'Not found' });
     const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket: BUCKET, Key: doc.rows[0].s3_key }), { expiresIn: 300 });
-    await pool.query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id) VALUES ($1,$2,$3,$4)', [userId,'doc.viewed','document',req.params.id]);
+    await pool.query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id,bank_id) VALUES ($1,$2,$3,$4,(SELECT a.bank_id FROM documents d2 JOIN applications a ON a.id=d2.application_id WHERE d2.id=$4))', [userId,'doc.viewed','document',req.params.id]);
     return res.json({ url });
   } catch(err) { console.error(err); return res.status(500).json({ error: 'Failed' }); }
 });

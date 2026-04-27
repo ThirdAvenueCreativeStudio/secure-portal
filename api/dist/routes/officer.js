@@ -78,7 +78,7 @@ router.patch('/documents/:id', async (req, res) => {
         return res.status(400).json({ error: 'Invalid status' });
     try {
         await db_1.pool.query('UPDATE documents SET status=$1,rejection_reason=$2,reviewed_at=NOW(),reviewed_by=$3 WHERE id=$4', [status, rejection_reason || null, userId, req.params.id]);
-        await db_1.pool.query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id) VALUES ($1,$2,$3,$4)', [userId, 'doc.' + status, 'document', req.params.id]);
+        await db_1.pool.query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id,bank_id) VALUES ($1,$2,$3,$4,(SELECT a.bank_id FROM documents d2 JOIN applications a ON a.id=d2.application_id WHERE d2.id=$4))', [userId, 'doc.' + status, 'document', req.params.id]);
         try {
             const r = await db_1.pool.query('SELECT d.doc_type,u.email,u.full_name,u.locale FROM documents d JOIN applications a ON a.id=d.application_id JOIN users u ON u.id=a.applicant_id WHERE d.id=$1', [req.params.id]);
             if (r.rows.length) {
@@ -123,7 +123,7 @@ router.get('/documents/:id/view', async (req, res) => {
         const decipher = (0, crypto_1.createDecipheriv)('aes-256-gcm', key, iv);
         decipher.setAuthTag(authTag);
         const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-        await db_1.pool.query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id) VALUES ($1,$2,$3,$4)', [userId, 'doc.viewed', 'document', req.params.id]);
+        await db_1.pool.query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id,bank_id) VALUES ($1,$2,$3,$4,(SELECT a.bank_id FROM documents d2 JOIN applications a ON a.id=d2.application_id WHERE d2.id=$4))', [userId, 'doc.viewed', 'document', req.params.id]);
         res.setHeader('Content-Type', doc.mime_type || 'application/octet-stream');
         res.setHeader('Content-Disposition', 'inline');
         res.setHeader('Content-Length', decrypted.length);
@@ -184,7 +184,7 @@ router.post('/invite-applicant', async (req, res) => {
         const exp = new Date(Date.now() + 15 * 60 * 1000);
         await db_1.pool.query('INSERT INTO auth_tokens (user_id,token_hash,expires_at) VALUES ($1,$2,$3)', [applicantId, hash, exp]);
         await (0, mailer_1.sendApplicantWelcome)(email, raw, full_name || email, locale);
-        await db_1.pool.query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id,metadata) VALUES ($1,$2,$3,$4,$5)', [userId, 'app.created', 'application', appId, JSON.stringify({ applicant_email: email })]);
+        await db_1.pool.query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id,bank_id,metadata) VALUES ($1,$2,$3,$4,(SELECT bank_id FROM applications WHERE id=$4),$5)', [userId, 'app.created', 'application', appId, JSON.stringify({ applicant_email: email })]);
         return res.json({ success: true, application_id: appId });
     }
     catch (err) {

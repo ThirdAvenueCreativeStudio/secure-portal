@@ -52,9 +52,71 @@ router.post('/invite-officer', async (req: Request, res: Response) => {
     const exp=new Date(Date.now()+15*60*1000);
     await pool.query('INSERT INTO auth_tokens (user_id,token_hash,expires_at) VALUES ($1,$2,$3)',[u.rows[0].id,hash,exp]);
     await sendMagicLink(email,raw,'es');
-    await pool.query('INSERT INTO audit_log (actor_id,action,entity_type,metadata) VALUES ($1,$2,$3,$4)',[auth.userId,'officer.invited','user',JSON.stringify({email,bank_id:auth.bankId})]);
+    await pool.query('INSERT INTO audit_log (actor_id,action,entity_type,bank_id,metadata) VALUES ($1,$2,$3,$4,$5)',[auth.userId,'officer.invited','user',auth.bankId,JSON.stringify({email,bank_id:auth.bankId})]);
     return res.json({ success:true });
   } catch(err){ console.error(err); return res.status(500).json({ error:'Failed' }); }
+});
+
+
+// GET /bank-admin/audit-log
+router.get('/audit-log', async (req, res) => {
+  const auth = await requireBankAdmin(req, res); if (!auth) return;
+  const { action, actor_id, entity_type, date_from, date_to } = req.query as any;
+  const page = Math.max(1, parseInt(req.query.page as string) || 1);
+  const perPage = Math.min(200, Math.max(1, parseInt(req.query.per_page as string) || 50));
+  try {
+    let where = 'WHERE al.bank_id=$1';
+    const params: any[] = [auth.bankId];
+    if (action) { params.push(action); where += ` AND al.action=$${params.length}`; }
+    if (actor_id) { params.push(actor_id); where += ` AND al.actor_id=$${params.length}`; }
+    if (entity_type) { params.push(entity_type); where += ` AND al.entity_type=$${params.length}`; }
+    if (date_from) { params.push(date_from); where += ` AND al.created_at >= $${params.length}::timestamptz`; }
+    if (date_to) { params.push(date_to); where += ` AND al.created_at <= $${params.length}::timestamptz`; }
+    const countRes = await pool.query(`SELECT COUNT(*) FROM audit_log al ${where}`, params);
+    const total = parseInt(countRes.rows[0].count);
+    const offset = (page - 1) * perPage;
+    params.push(perPage, offset);
+    const logs = await pool.query(
+      `SELECT al.*, u.email as actor_email, u.full_name as actor_name, u.role as actor_role
+       FROM audit_log al LEFT JOIN users u ON u.id=al.actor_id
+       ${where} ORDER BY al.created_at DESC
+       LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
+    return res.json({ data: logs.rows, pagination: { page, per_page: perPage, total, total_pages: Math.ceil(total / perPage) } });
+  } catch(err) { console.error(err); return res.status(500).json({ error:'Failed' }); }
+});
+
+
+// GET /bank-admin/audit-log/export
+router.get('/audit-log/export', async (req, res) => {
+  const auth = await requireBankAdmin(req, res); if (!auth) return;
+  const { action, actor_id, entity_type, date_from, date_to } = req.query as any;
+  if (!date_from || !date_to) return res.status(400).json({ error: 'date_from and date_to required' });
+  const diffDays = (new Date(date_to).getTime() - new Date(date_from).getTime()) / (1000*60*60*24);
+  if (diffDays > 90) return res.status(400).json({ error: 'Max 90-day range' });
+  try {
+    let where = 'WHERE al.bank_id=$1';
+    const params: any[] = [auth.bankId];
+    params.push(date_from); where += ` AND al.created_at >= $${params.length}::timestamptz`;
+    params.push(date_to); where += ` AND al.created_at <= $${params.length}::timestamptz`;
+    if (action) { params.push(action); where += ` AND al.action=$${params.length}`; }
+    if (actor_id) { params.push(actor_id); where += ` AND al.actor_id=$${params.length}`; }
+    if (entity_type) { params.push(entity_type); where += ` AND al.entity_type=$${params.length}`; }
+    const logs = await pool.query(
+      `SELECT al.created_at, u.full_name as actor_name, u.email as actor_email, u.role as actor_role,
+              al.action, al.entity_type, al.entity_id, al.metadata
+       FROM audit_log al LEFT JOIN users u ON u.id=al.actor_id
+       ${where} ORDER BY al.created_at DESC`, params);
+    const header = 'Timestamp,Actor,Email,Role,Action,Entity Type,Entity ID,Metadata';
+    const rows = logs.rows.map((r) => {
+      const ts = new Date(r.created_at).toISOString();
+      const meta = r.metadata ? JSON.stringify(r.metadata).replace(/"/g,'""') : '';
+      return ts+',"'+(r.actor_name||'')+'","'+(r.actor_email||'')+'","'+(r.actor_role||'')+'","'+r.action+'","'+(r.entity_type||'')+'","'+(r.entity_id||'')+'","'+meta+'"';
+    });
+    const csv = [header, ...rows].join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="audit-log.csv"');
+    return res.send(csv);
+  } catch(err) { console.error(err); return res.status(500).json({ error:'Failed' }); }
 });
 
 export default router;

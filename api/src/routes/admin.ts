@@ -69,10 +69,11 @@ router.post('/invite-officer', async (req: Request, res: Response) => {
 // GET /admin/audit-log
 router.get('/audit-log', async (req: Request, res: Response) => {
   const userId = await requireAdmin(req, res); if (!userId) return;
-  const { action, lim=100 } = req.query;
+  const { action, bank_id, lim=100 } = req.query;
   try {
     let q='SELECT al.*,u.email as actor_email FROM audit_log al LEFT JOIN users u ON u.id=al.actor_id WHERE 1=1';
     const params: any[]=[];
+    if (bank_id) { params.push(bank_id); q+=` AND al.bank_id=$${params.length}`; }
     if (action) { params.push(action); q+=` AND al.action=$${params.length}`; }
     params.push(Math.min(Number(lim),500));
     q+=` ORDER BY al.created_at DESC LIMIT $${params.length}`;
@@ -123,7 +124,7 @@ router.patch('/applications/:id/assign', async (req: Request, res: Response) => 
   const { officer_id } = req.body;
   try {
     await pool.query('UPDATE applications SET assigned_to=$1, updated_at=NOW() WHERE id=$2',[officer_id||null, req.params.id]);
-    await pool.query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id,metadata) VALUES ($1,$2,$3,$4,$5)',[userId,'app.assigned','application',req.params.id,JSON.stringify({assigned_to:officer_id})]);
+    await pool.query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id,bank_id,metadata) VALUES ($1,$2,$3,$4,(SELECT bank_id FROM applications WHERE id=$4),$5)',[userId,'app.assigned','application',req.params.id,JSON.stringify({assigned_to:officer_id})]);
     return res.json({ success:true });
   } catch(err){ console.error(err); return res.status(500).json({ error:'Failed' }); }
 });
@@ -165,7 +166,7 @@ router.post('/invite-bank-admin', async (req: Request, res: Response) => {
     const exp=new Date(Date.now()+15*60*1000);
     await pool.query('INSERT INTO auth_tokens (user_id,token_hash,expires_at) VALUES ($1,$2,$3)',[u.rows[0].id,hash,exp]);
     await sendMagicLink(email,raw,'es');
-    await pool.query('INSERT INTO audit_log (actor_id,action,entity_type,metadata) VALUES ($1,$2,$3,$4)',[userId,'bank_admin.invited','user',JSON.stringify({email,bank_id})]);
+    await pool.query('INSERT INTO audit_log (actor_id,action,entity_type,bank_id,metadata) VALUES ($1,$2,$3,$4,$5)',[userId,'bank_admin.invited','user',bank_id,JSON.stringify({email,bank_id})]);
     return res.json({success:true});
   } catch(e){ console.error(e); return res.status(500).json({error:'Failed'}); }
 });

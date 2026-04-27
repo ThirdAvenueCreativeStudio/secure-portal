@@ -16,14 +16,15 @@ router.post('/request', async (req, res) => {
         const rate = await db_1.pool.query("SELECT COUNT(*) FROM auth_tokens JOIN users ON users.id=auth_tokens.user_id WHERE users.email=$1 AND auth_tokens.created_at>NOW()-INTERVAL '1 hour'", [email]);
         if (parseInt(rate.rows[0].count) >= 3)
             return res.status(429).json({ error: 'Too many requests' });
-        const user = await db_1.pool.query("INSERT INTO users (email,role,locale) VALUES ($1,'applicant',$2) ON CONFLICT (email) DO UPDATE SET locale=$2 RETURNING id", [email, locale]);
+        const user = await db_1.pool.query("INSERT INTO users (email,role,locale) VALUES ($1,'applicant',$2) ON CONFLICT (email) DO UPDATE SET locale=$2 RETURNING id,bank_id", [email, locale]);
         const userId = user.rows[0].id;
+        const bankId = user.rows[0].bank_id || null;
         const raw = (0, crypto_1.randomBytes)(32).toString('hex');
         const hash = (0, crypto_1.createHash)('sha256').update(raw).digest('hex');
         const exp = new Date(Date.now() + 15 * 60 * 1000);
         await db_1.pool.query('INSERT INTO auth_tokens (user_id,token_hash,expires_at) VALUES ($1,$2,$3)', [userId, hash, exp]);
         await (0, mailer_1.sendMagicLink)(email, raw, locale);
-        await db_1.pool.query("INSERT INTO audit_log (actor_id,action,entity_type,entity_id,metadata) VALUES ($1,'auth.requested','user',$1,$2)", [userId, JSON.stringify({ ip: req.ip })]);
+        await db_1.pool.query("INSERT INTO audit_log (actor_id,action,entity_type,entity_id,bank_id,metadata) VALUES ($1,'auth.requested','user',$1,bankId,$2)", [userId, JSON.stringify({ ip: req.ip })]);
         return res.json({ success: true });
     }
     catch (err) {
@@ -37,7 +38,7 @@ router.get('/verify', async (req, res) => {
         return res.status(400).json({ error: 'Missing token' });
     try {
         const hash = (0, crypto_1.createHash)('sha256').update(raw).digest('hex');
-        const result = await db_1.pool.query('SELECT at.id,at.user_id,at.expires_at,at.used_at,u.email,u.role,u.locale FROM auth_tokens at JOIN users u ON u.id=at.user_id WHERE at.token_hash=$1', [hash]);
+        const result = await db_1.pool.query('SELECT at.id,at.user_id,at.expires_at,at.used_at,u.email,u.role,u.locale,u.bank_id FROM auth_tokens at JOIN users u ON u.id=at.user_id WHERE at.token_hash=$1', [hash]);
         if (!result.rows.length)
             return res.status(401).json({ error: 'Invalid token' });
         const t = result.rows[0];
@@ -46,7 +47,7 @@ router.get('/verify', async (req, res) => {
         if (new Date(t.expires_at) < new Date())
             return res.status(401).json({ error: 'Token expired' });
         await db_1.pool.query('UPDATE auth_tokens SET used_at=NOW() WHERE id=$1', [t.id]);
-        await db_1.pool.query("INSERT INTO audit_log (actor_id,action,entity_type,entity_id,metadata) VALUES ($1,'auth.login','user',$1,$2)", [t.user_id, JSON.stringify({ ip: req.ip })]);
+        await db_1.pool.query("INSERT INTO audit_log (actor_id,action,entity_type,entity_id,bank_id,metadata) VALUES ($1,'auth.login','user',$1,t.bank_id||null,$2)", [t.user_id, JSON.stringify({ ip: req.ip })]);
         res.cookie('session', t.user_id, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict', maxAge: 8 * 60 * 60 * 1000 });
         return res.json({ success: true, user: { id: t.user_id, email: t.email, role: t.role, locale: t.locale } });
     }
@@ -57,8 +58,11 @@ router.get('/verify', async (req, res) => {
 });
 router.post('/logout', async (req, res) => {
     const userId = req.cookies?.session || req.headers['x-user-id'];
-    if (userId)
-        await db_1.pool.query("INSERT INTO audit_log (actor_id,action,entity_type,entity_id) VALUES ($1,'auth.logout','user',$1)", [userId]).catch(() => { });
+    if (userId) {
+        const ub = await db_1.pool.query('SELECT bank_id FROM users WHERE id=$1', [userId]).catch(() => ({ rows: [] }));
+        const bid = ub.rows[0]?.bank_id || null;
+        await db_1.pool.query("INSERT INTO audit_log (actor_id,action,entity_type,entity_id,bank_id) VALUES ($1,'auth.logout','user',$1,$2)", [userId, bid]).catch(() => { });
+    }
     res.clearCookie('session');
     return res.json({ success: true });
 });

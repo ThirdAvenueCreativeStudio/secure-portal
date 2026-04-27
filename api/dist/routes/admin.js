@@ -92,10 +92,14 @@ router.get('/audit-log', async (req, res) => {
     const userId = await requireAdmin(req, res);
     if (!userId)
         return;
-    const { action, lim = 100 } = req.query;
+    const { action, bank_id, lim = 100 } = req.query;
     try {
         let q = 'SELECT al.*,u.email as actor_email FROM audit_log al LEFT JOIN users u ON u.id=al.actor_id WHERE 1=1';
         const params = [];
+        if (bank_id) {
+            params.push(bank_id);
+            q += ` AND al.bank_id=$${params.length}`;
+        }
         if (action) {
             params.push(action);
             q += ` AND al.action=$${params.length}`;
@@ -169,7 +173,7 @@ router.patch('/applications/:id/assign', async (req, res) => {
     const { officer_id } = req.body;
     try {
         await db_1.pool.query('UPDATE applications SET assigned_to=$1, updated_at=NOW() WHERE id=$2', [officer_id || null, req.params.id]);
-        await db_1.pool.query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id,metadata) VALUES ($1,$2,$3,$4,$5)', [userId, 'app.assigned', 'application', req.params.id, JSON.stringify({ assigned_to: officer_id })]);
+        await db_1.pool.query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id,bank_id,metadata) VALUES ($1,$2,$3,$4,(SELECT bank_id FROM applications WHERE id=$4),$5)', [userId, 'app.assigned', 'application', req.params.id, JSON.stringify({ assigned_to: officer_id })]);
         return res.json({ success: true });
     }
     catch (err) {
@@ -229,7 +233,7 @@ router.post('/invite-bank-admin', async (req, res) => {
         const exp = new Date(Date.now() + 15 * 60 * 1000);
         await db_1.pool.query('INSERT INTO auth_tokens (user_id,token_hash,expires_at) VALUES ($1,$2,$3)', [u.rows[0].id, hash, exp]);
         await (0, mailer_1.sendMagicLink)(email, raw, 'es');
-        await db_1.pool.query('INSERT INTO audit_log (actor_id,action,entity_type,metadata) VALUES ($1,$2,$3,$4)', [userId, 'bank_admin.invited', 'user', JSON.stringify({ email, bank_id })]);
+        await db_1.pool.query('INSERT INTO audit_log (actor_id,action,entity_type,bank_id,metadata) VALUES ($1,$2,$3,$4,$5)', [userId, 'bank_admin.invited', 'user', bank_id, JSON.stringify({ email, bank_id })]);
         return res.json({ success: true });
     }
     catch (e) {

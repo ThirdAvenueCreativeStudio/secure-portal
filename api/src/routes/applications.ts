@@ -18,7 +18,9 @@ router.patch('/:id/status', async (req: Request, res: Response) => {
   if (!['submitted','approved','rejected'].includes(status)) return res.status(400).json({ error:'Invalid status' });
   try {
     await pool.query('UPDATE applications SET status=$1,updated_at=NOW() WHERE id=$2',[status,req.params.id]);
-    await pool.query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id,metadata) VALUES ($1,$2,$3,$4,$5)',[userId,'app.status_changed','application',req.params.id,JSON.stringify({status})]);
+    const appRes2 = await pool.query('SELECT bank_id FROM applications WHERE id=$1',[req.params.id]);
+    const bankId = appRes2.rows[0]?.bank_id || null;
+    await pool.query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id,bank_id,metadata) VALUES ($1,$2,$3,$4,$5,$6)',[userId,'app.status_changed','application',req.params.id,bankId,JSON.stringify({status})]);
     return res.json({ success:true });
   } catch(err){ console.error(err); return res.status(500).json({ error:'Failed' }); }
 });
