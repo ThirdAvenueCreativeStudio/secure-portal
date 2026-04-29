@@ -18,6 +18,7 @@ export default function BankAdminPage() {
   const [checklistMsg, setChecklistMsg] = useState("");
   const [newDoc, setNewDoc] = useState({doc_type:"",label_es:"",label_en:"",required:true});
   const [dragIdx, setDragIdx] = useState<number|null>(null);
+  const [savedSlugs, setSavedSlugs] = useState<Set<string>>(new Set());
 
   // Audit log state
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
@@ -38,7 +39,7 @@ export default function BankAdminPage() {
   useEffect(() => {
     if (!user) return;
     if (tab === "applications") fetch(API+"/api/v1/bank-admin/applications", { headers: { "x-user-id": user.id } }).then(r=>r.json()).then(d=>setApps(d.applications||[]));
-    if (tab === "checklist") fetch(API+"/api/v1/bank-admin/checklist",{headers:{"x-user-id":user.id}}).then(r=>r.json()).then(d=>setChecklist(d.checklist||[]));
+    if (tab === "checklist") fetch(API+"/api/v1/bank-admin/checklist",{headers:{"x-user-id":user.id}}).then(r=>r.json()).then(d=>{setChecklist(d.checklist||[]);setSavedSlugs(new Set((d.checklist||[]).map((c:any)=>c.doc_type)));});
     if (tab === "audit") fetchAuditLogs(1);
     if (tab === "team") {
       fetch(API+"/api/v1/bank-admin/team", { headers: { "x-user-id": user.id } }).then(r=>r.json()).then(d=>setTeam(d.users||[]));
@@ -297,8 +298,8 @@ export default function BankAdminPage() {
                 </tr></thead>
                 <tbody>{checklist.map((doc:any,i:number)=>(<tr key={doc.doc_type+i} draggable onDragStart={()=>setDragIdx(i)} onDragOver={e=>e.preventDefault()} onDrop={()=>{if(dragIdx===null||dragIdx===i)return;const c2=[...checklist];const item=c2.splice(dragIdx,1)[0];c2.splice(i,0,item);setChecklist(c2);setDragIdx(null);}} style={{borderTop:"1px solid #f0f0f0",cursor:"grab",background:dragIdx===i?"#f0f4ff":"white"}}>
                   <td style={{padding:"4px 8px",textAlign:"center"}}><button onClick={()=>{if(i===0)return;const c2=[...checklist];[c2[i-1],c2[i]]=[c2[i],c2[i-1]];setChecklist(c2);}} style={{border:"none",background:"none",cursor:i===0?"default":"pointer",opacity:i===0?0.2:1,fontSize:12,padding:"2px 4px"}}>▲</button><button onClick={()=>{if(i>=checklist.length-1)return;const c2=[...checklist];[c2[i],c2[i+1]]=[c2[i+1],c2[i]];setChecklist(c2);}} style={{border:"none",background:"none",cursor:i>=checklist.length-1?"default":"pointer",opacity:i>=checklist.length-1?0.2:1,fontSize:12,padding:"2px 4px"}}>▼</button></td>
-                  <td style={{padding:"8px 16px"}}><input value={doc.label_es||""} onChange={e=>{const c2=[...checklist];c2[i]={...c2[i],label_es:e.target.value};setChecklist(c2);}} style={{width:"100%",padding:"6px 8px",border:"1px solid #ddd",borderRadius:6,fontSize:13}} /></td>
-                  <td style={{padding:"8px 16px"}}><input value={doc.label_en||""} onChange={e=>{const c2=[...checklist];c2[i]={...c2[i],label_en:e.target.value};setChecklist(c2);}} style={{width:"100%",padding:"6px 8px",border:"1px solid #ddd",borderRadius:6,fontSize:13}} /></td>
+                  <td style={{padding:"8px 16px"}}>{savedSlugs.has(doc.doc_type)?<span style={{fontSize:14,fontWeight:500,color:"#333"}}>{doc.label_es}</span>:<input value={doc.label_es||""} onChange={e=>{const c2=[...checklist];c2[i]={...c2[i],label_es:e.target.value};setChecklist(c2);}} style={{width:"100%",padding:"6px 8px",border:"1px solid #ddd",borderRadius:6,fontSize:13}} />}</td>
+                  <td style={{padding:"8px 16px"}}>{savedSlugs.has(doc.doc_type)?<span style={{fontSize:14,color:"#666"}}>{doc.label_en}</span>:<input value={doc.label_en||""} onChange={e=>{const c2=[...checklist];c2[i]={...c2[i],label_en:e.target.value};setChecklist(c2);}} style={{width:"100%",padding:"6px 8px",border:"1px solid #ddd",borderRadius:6,fontSize:13}} />}</td>
                   <td style={{padding:"8px 16px",textAlign:"center"}}><input type="checkbox" aria-label="required" checked={doc.required!==false} onChange={e=>{const c2=[...checklist];c2[i]={...c2[i],required:e.target.checked};setChecklist(c2);}} /></td>
                 <td style={{padding:"8px 4px",textAlign:"center"}}><button onClick={()=>{const c2=[...checklist];c2.splice(i,1);setChecklist(c2);}} style={{border:"none",background:"none",cursor:"pointer",color:"#c0392b",fontSize:16,padding:"4px 8px"}}>✕</button></td></tr>))}</tbody>
               </table>
