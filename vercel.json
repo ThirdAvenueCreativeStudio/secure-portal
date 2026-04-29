@@ -1,8 +1,5 @@
 {
   "buildCommand": "next build",
   "outputDirectory": ".next",
-  "installCommand": "npm install",
-  "ignoreCommand": "",
-  "functions": {},
-  "rewrites": []
+  "installCommand": "npm install"
 }
