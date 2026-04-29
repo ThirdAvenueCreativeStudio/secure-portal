@@ -118,7 +118,7 @@ export default function BankAdminPage() {
       <div style={{ background:NAVY, color:"white", padding:"16px 32px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
         <span style={{ fontWeight:700, fontSize:18 }}>DocuHogar <span style={{ color:GOLD, fontSize:13, fontWeight:400 }}>Portal Bancario</span></span>
         <div style={{ display:"flex", gap:16, alignItems:"center" }}>
-          <span style={{ fontSize:13, opacity:0.7 }}>{user.email}</span>
+          <span style={{fontSize:11,padding:"3px 10px",borderRadius:20,background:"rgba(200,151,58,0.2)",color:"#C8973A",fontWeight:600}}>Admin Banco</span><span style={{ fontSize:13, opacity:0.7 }}>{user.email}</span>
           <button onClick={logout} style={{ background:"transparent", border:"1px solid rgba(255,255,255,0.3)", color:"white", padding:"6px 14px", borderRadius:6, cursor:"pointer", fontSize:12 }}>Logout</button>
         </div>
       </div>

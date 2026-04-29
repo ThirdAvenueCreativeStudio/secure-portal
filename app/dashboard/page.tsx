@@ -66,7 +66,7 @@ export default function Dashboard(){
       </div>
     </nav>
     <div style={{background:"#0F2340",padding:"24px 20px",color:"white"}}>
-      <h2 style={{fontSize:"18px"}}>{user.email}</h2>
+      <div style={{display:"flex",alignItems:"center",gap:12}}><h2 style={{fontSize:"18px"}}>{user.email}</h2><span style={{fontSize:11,padding:"3px 10px",borderRadius:20,background:"rgba(100,180,255,0.15)",color:"#7ec8f8",fontWeight:600}}>{locale==="es"?"Solicitante":"Applicant"}</span></div>
       <p style={{marginTop:"16px",fontSize:"14px"}}>{pct}% - {approved}/{total} docs</p>
     </div>
     <div style={{maxWidth:"480px",margin:"0 auto",padding:"24px 16px"}}>

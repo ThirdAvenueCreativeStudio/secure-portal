@@ -96,7 +96,7 @@ export default function AdminPage() {
     <main style={{ fontFamily:"sans-serif", background:"#F4F7FB", minHeight:"100vh" }}>
       <div style={{ background:NAVY, color:"white", padding:"16px 32px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
         <span style={{ fontWeight:700, fontSize:18 }}>DocuHogar Admin</span>
-        <span style={{ fontSize:13, opacity:0.7 }}>{user.email}</span>
+        <div style={{display:"flex",gap:12,alignItems:"center"}}><span style={{fontSize:11,padding:"3px 10px",borderRadius:20,background:"rgba(255,77,77,0.15)",color:"#ff6b6b",fontWeight:600}}>Administrador</span><span style={{ fontSize:13, opacity:0.7 }}>{user.email}</span></div>
       </div>
       <div style={{ display:"flex", background:"white", borderBottom:"2px solid #e0e7ef", padding:"0 32px" }}>
         {TABS.map(t => (

@@ -86,7 +86,7 @@ export default function OfficerDashboard() {
       <nav style={{ background:'#0F2340', padding:'0 20px', height:'56px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <span style={{ color:'white', fontSize:'13px', fontWeight:500 }}>DocuHogar · Loan Officer</span>
         <div style={{ display:'flex', alignItems:'center', gap:16 }}>
-          <span style={{ color:'rgba(255,255,255,0.6)', fontSize:'12px' }}>{user?.email}</span>
+          <span style={{fontSize:11,padding:'3px 10px',borderRadius:20,background:'rgba(100,200,150,0.15)',color:'#6bcf8e',fontWeight:600}}>Oficial</span><span style={{ color:'rgba(255,255,255,0.6)', fontSize:'12px' }}>{user?.email}</span>
           <div style={{display:'flex',gap:12,alignItems:'center'}}>
             <button onClick={()=>setShowInvite(true)} style={{background:'#C8973A',border:'none',color:'#0F2340',padding:'8px 16px',borderRadius:8,cursor:'pointer',fontSize:13,fontWeight:700}}>+ Nueva Solicitud</button>
             <button onClick={logout} style={{background:'transparent',border:'none',color:'rgba(255,255,255,0.6)',cursor:'pointer',fontSize:12}}>Logout</button>
