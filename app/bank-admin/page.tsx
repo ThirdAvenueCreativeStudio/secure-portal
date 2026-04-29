@@ -291,33 +291,29 @@ export default function BankAdminPage() {
                 <thead><tr style={{background:"#F4F7FB"}}>
                   <th style={{padding:"12px 8px",textAlign:"center",fontSize:12,width:60}}>Orden</th>
                   <th style={{padding:"12px 16px",textAlign:"left",fontSize:12}}>Documento</th>
-                  <th style={{padding:"12px 16px",textAlign:"left",fontSize:12}}>Etiqueta ES</th>
-                  <th style={{padding:"12px 16px",textAlign:"left",fontSize:12}}>Etiqueta EN</th>
+                  <th style={{padding:"12px 16px",textAlign:"left",fontSize:12}}>English</th>
                   <th style={{padding:"12px 16px",textAlign:"center",fontSize:12}}>Requerido</th>
                   <th style={{padding:"12px 8px",textAlign:"center",fontSize:12,width:50}}></th>
                 </tr></thead>
                 <tbody>{checklist.map((doc:any,i:number)=>(<tr key={doc.doc_type+i} draggable onDragStart={()=>setDragIdx(i)} onDragOver={e=>e.preventDefault()} onDrop={()=>{if(dragIdx===null||dragIdx===i)return;const c2=[...checklist];const item=c2.splice(dragIdx,1)[0];c2.splice(i,0,item);setChecklist(c2);setDragIdx(null);}} style={{borderTop:"1px solid #f0f0f0",cursor:"grab",background:dragIdx===i?"#f0f4ff":"white"}}>
-                  <td style={{padding:"4px 8px",textAlign:"center"}}><button onClick={()=>{if(i===0)return;const c2=[...checklist];[c2[i-1],c2[i]]=[c2[i],c2[i-1]];setChecklist(c2);}} style={{border:"none",background:"none",cursor:i===0?"default":"pointer",opacity:i===0?0.2:1,fontSize:12,padding:"2px 4px"}}>▲</button><button onClick={()=>{if(i>=checklist.length-1)return;const c2=[...checklist];[c2[i],c2[i+1]]=[c2[i+1],c2[i]];setChecklist(c2);}} style={{border:"none",background:"none",cursor:i>=checklist.length-1?"default":"pointer",opacity:i>=checklist.length-1?0.2:1,fontSize:12,padding:"2px 4px"}}>▼</button></td><td style={{padding:"12px 16px",fontSize:13,color:"#999",fontFamily:"monospace"}}>{doc.doc_type}</td>
+                  <td style={{padding:"4px 8px",textAlign:"center"}}><button onClick={()=>{if(i===0)return;const c2=[...checklist];[c2[i-1],c2[i]]=[c2[i],c2[i-1]];setChecklist(c2);}} style={{border:"none",background:"none",cursor:i===0?"default":"pointer",opacity:i===0?0.2:1,fontSize:12,padding:"2px 4px"}}>▲</button><button onClick={()=>{if(i>=checklist.length-1)return;const c2=[...checklist];[c2[i],c2[i+1]]=[c2[i+1],c2[i]];setChecklist(c2);}} style={{border:"none",background:"none",cursor:i>=checklist.length-1?"default":"pointer",opacity:i>=checklist.length-1?0.2:1,fontSize:12,padding:"2px 4px"}}>▼</button></td>
                   <td style={{padding:"8px 16px"}}><input value={doc.label_es||""} onChange={e=>{const c2=[...checklist];c2[i]={...c2[i],label_es:e.target.value};setChecklist(c2);}} style={{width:"100%",padding:"6px 8px",border:"1px solid #ddd",borderRadius:6,fontSize:13}} /></td>
                   <td style={{padding:"8px 16px"}}><input value={doc.label_en||""} onChange={e=>{const c2=[...checklist];c2[i]={...c2[i],label_en:e.target.value};setChecklist(c2);}} style={{width:"100%",padding:"6px 8px",border:"1px solid #ddd",borderRadius:6,fontSize:13}} /></td>
                   <td style={{padding:"8px 16px",textAlign:"center"}}><input type="checkbox" aria-label="required" checked={doc.required!==false} onChange={e=>{const c2=[...checklist];c2[i]={...c2[i],required:e.target.checked};setChecklist(c2);}} /></td>
                 <td style={{padding:"8px 4px",textAlign:"center"}}><button onClick={()=>{const c2=[...checklist];c2.splice(i,1);setChecklist(c2);}} style={{border:"none",background:"none",cursor:"pointer",color:"#c0392b",fontSize:16,padding:"4px 8px"}}>✕</button></td></tr>))}</tbody>
               </table>
             </div>
-            <div style={{background:"white",borderRadius:12,padding:20,marginTop:16,boxShadow:"0 1px 4px rgba(0,0,0,0.07)",display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:12,alignItems:"end"}}>
+            <div style={{background:"white",borderRadius:12,padding:20,marginTop:16,boxShadow:"0 1px 4px rgba(0,0,0,0.07)",display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:12,alignItems:"end"}}>
+
               <div>
-                <label style={{display:"block",fontSize:11,color:"#999",marginBottom:4,fontWeight:600}}>Tipo (slug)</label>
-                <input value={newDoc.doc_type} onChange={e=>setNewDoc({...newDoc,doc_type:e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,"_")})} placeholder="ej: carta_trabajo" style={{width:"100%",padding:"8px",border:"1px solid #ddd",borderRadius:6,fontSize:13,fontFamily:"monospace"}}/>
+                <label style={{display:"block",fontSize:11,color:"#999",marginBottom:4,fontWeight:600}}>Nombre del documento</label>
+                <input value={newDoc.label_es} onChange={e=>{const v=e.target.value;const slug=v.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"");setNewDoc({...newDoc,label_es:v,doc_type:slug});}} placeholder="Carta de trabajo" style={{width:"100%",padding:"8px",border:"1px solid #ddd",borderRadius:6,fontSize:13}}/>
               </div>
               <div>
-                <label style={{display:"block",fontSize:11,color:"#999",marginBottom:4,fontWeight:600}}>Etiqueta ES</label>
-                <input value={newDoc.label_es} onChange={e=>setNewDoc({...newDoc,label_es:e.target.value})} placeholder="Carta de trabajo" style={{width:"100%",padding:"8px",border:"1px solid #ddd",borderRadius:6,fontSize:13}}/>
-              </div>
-              <div>
-                <label style={{display:"block",fontSize:11,color:"#999",marginBottom:4,fontWeight:600}}>Etiqueta EN</label>
+                <label style={{display:"block",fontSize:11,color:"#999",marginBottom:4,fontWeight:600}}>English name</label>
                 <input value={newDoc.label_en} onChange={e=>setNewDoc({...newDoc,label_en:e.target.value})} placeholder="Employment letter" style={{width:"100%",padding:"8px",border:"1px solid #ddd",borderRadius:6,fontSize:13}}/>
               </div>
-              <button onClick={()=>{if(!newDoc.doc_type||!newDoc.label_es)return;if(checklist.some(d=>d.doc_type===newDoc.doc_type)){setChecklistMsg("Error: tipo ya existe");return;}setChecklist([...checklist,{...newDoc}]);setNewDoc({doc_type:"",label_es:"",label_en:"",required:true});}} style={{padding:"8px 20px",background:"#1a7a4a",color:"white",border:"none",borderRadius:6,fontWeight:600,cursor:"pointer",fontSize:13,height:36}}>+ Agregar</button>
+              <button onClick={()=>{if(!newDoc.label_es)return;if(checklist.some(d=>d.doc_type===newDoc.doc_type)){setChecklistMsg("Error: tipo ya existe");return;}setChecklist([...checklist,{...newDoc}]);setNewDoc({doc_type:"",label_es:"",label_en:"",required:true});}} style={{padding:"8px 20px",background:"#1a7a4a",color:"white",border:"none",borderRadius:6,fontWeight:600,cursor:"pointer",fontSize:13,height:36}}>+ Agregar</button>
             </div>
 {checklistMsg&&<p style={{marginTop:16,fontWeight:500,color:checklistMsg.startsWith("Error")?"#c0392b":"#1a7a4a"}}>{checklistMsg}</p>}
           </div>
