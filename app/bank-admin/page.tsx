@@ -36,6 +36,7 @@ export default function BankAdminPage() {
   useEffect(() => {
     if (!user) return;
     if (tab === "applications") fetch(API+"/api/v1/bank-admin/applications", { headers: { "x-user-id": user.id } }).then(r=>r.json()).then(d=>setApps(d.applications||[]));
+    if (tab === "checklist") fetch(API+"/api/v1/bank-admin/checklist",{headers:{"x-user-id":user.id}}).then(r=>r.json()).then(d=>setChecklist(d.checklist||[]));
     if (tab === "audit") fetchAuditLogs(1);
     if (tab === "team") {
       fetch(API+"/api/v1/bank-admin/team", { headers: { "x-user-id": user.id } }).then(r=>r.json()).then(d=>setTeam(d.users||[]));
