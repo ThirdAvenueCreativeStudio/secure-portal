@@ -7,7 +7,7 @@ router.get('/me', async (req: Request, res: Response) => {
   if (!userId) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const app = await pool.query('SELECT * FROM applications WHERE applicant_id=$1 ORDER BY created_at DESC LIMIT 1',[userId]);
-    if (!app.rows.length) return res.json({ application:null, documents:[] });
+    if (!app.rows.length) return res.json({ application:null, documents:[], checklist: DEFAULT_CHECKLIST });
     const docs = await pool.query('SELECT doc_type,status,rejection_reason FROM documents WHERE application_id=$1',[app.rows[0].id]);
     const bankId = app.rows[0].bank_id;
     let checklist = DEFAULT_CHECKLIST;

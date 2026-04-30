@@ -11,7 +11,7 @@ router.get('/me', async (req, res) => {
     try {
         const app = await db_1.pool.query('SELECT * FROM applications WHERE applicant_id=$1 ORDER BY created_at DESC LIMIT 1', [userId]);
         if (!app.rows.length)
-            return res.json({ application: null, documents: [] });
+            return res.json({ application: null, documents: [], checklist: checklist_1.DEFAULT_CHECKLIST });
         const docs = await db_1.pool.query('SELECT doc_type,status,rejection_reason FROM documents WHERE application_id=$1', [app.rows[0].id]);
         const bankId = app.rows[0].bank_id;
         let checklist = checklist_1.DEFAULT_CHECKLIST;
