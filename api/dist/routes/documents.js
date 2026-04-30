@@ -57,10 +57,10 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         }
         else {
             applicationId = appResult.rows[0].id;
-            const bankId = appResult.rows[0].bank_id || null;
+            bankId = appResult.rows[0].bank_id || null;
         }
         await db_1.pool.query('INSERT INTO documents (application_id,doc_type,status,s3_key,s3_iv,original_filename,file_size_bytes,mime_type,uploaded_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW()) ON CONFLICT DO NOTHING', [applicationId, doc_type, 'uploaded', s3Key, iv.toString('hex'), req.file.originalname, req.file.size, req.file.mimetype]);
-        await db_1.pool.query('INSERT INTO audit_log (actor_id,action,entity_type,bank_id,metadata) VALUES ($1,$2,$3,bankId,$4)', [userId, 'doc.uploaded', 'document', JSON.stringify({ doc_type, size: req.file.size })]);
+        await db_1.pool.query('INSERT INTO audit_log (actor_id,action,entity_type,bank_id,metadata) VALUES ($1,$2,$3,$4,$5)', [userId, 'doc.uploaded', 'document', bankId, JSON.stringify({ doc_type, size: req.file.size })]);
         // Notify officer — find any officer/admin for this bank (or globally)
         try {
             const officers = await db_1.pool.query("SELECT u.email, u.full_name FROM users u WHERE u.role IN ('officer','admin') LIMIT 5");
