@@ -9,8 +9,8 @@ export default function Home() {
   const [error, setError] = useState('');
 
   const copy: Record<string, Record<string, string>> = {
-    es: { title: 'Envíe sus documentos de forma segura', sub: 'Cifrado de extremo a extremo.', label: 'Correo electrónico', btn: 'Enviar enlace seguro', note: 'No se necesita contraseña.', sentTitle: 'Revise su correo', sentBody: 'Le enviamos un enlace. Expira en 15 minutos.', placeholder: 'nombre@correo.com' },
-    en: { title: 'Submit your documents securely', sub: 'End-to-end encrypted.', label: 'Email address', btn: 'Send secure link', note: 'No password needed.', sentTitle: 'Check your email', sentBody: 'We sent you a link. It expires in 15 minutes.', placeholder: 'name@email.com' },
+    es: { title: 'Envíe sus documentos de forma segura', sub: 'Cifrado de extremo a extremo.', label: 'Correo electrónico', btn: 'Enviar enlace seguro', note: 'No se necesita contraseña.', sentTitle: 'Revise su correo', sentBody: 'Si su cuenta existe, recibira un enlace de acceso. Expira en 15 minutos.', placeholder: 'nombre@correo.com' },
+    en: { title: 'Submit your documents securely', sub: 'End-to-end encrypted.', label: 'Email address', btn: 'Send secure link', note: 'No password needed.', sentTitle: 'Check your email', sentBody: 'If your account exists, you will receive an access link. It expires in 15 minutes.', placeholder: 'name@email.com' },
   };
   const t = copy[locale];
 
