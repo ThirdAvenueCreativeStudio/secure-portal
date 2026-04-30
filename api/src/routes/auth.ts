@@ -15,10 +15,9 @@ router.post('/request', async (req: Request, res: Response) => {
       [email]
     );
     if (parseInt(rate.rows[0].count) >= 3) return res.status(429).json({ error: 'Too many requests' });
-    const user = await pool.query(
-      "INSERT INTO users (email,role,locale) VALUES ($1,'applicant',$2) ON CONFLICT (email) DO UPDATE SET locale=$2 RETURNING id,bank_id",
-      [email, locale]
-    );
+    const user = await pool.query("SELECT id,bank_id FROM users WHERE email=$1", [email]);
+    if (!user.rows.length) return res.json({ success: true });
+    await pool.query("UPDATE users SET locale=$1 WHERE id=$2", [locale, user.rows[0].id]);
     const userId = user.rows[0].id;
     const bankId = user.rows[0].bank_id || null;
     const raw = randomBytes(32).toString('hex');

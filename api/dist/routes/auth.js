@@ -16,7 +16,10 @@ router.post('/request', async (req, res) => {
         const rate = await db_1.pool.query("SELECT COUNT(*) FROM auth_tokens JOIN users ON users.id=auth_tokens.user_id WHERE users.email=$1 AND auth_tokens.created_at>NOW()-INTERVAL '1 hour'", [email]);
         if (parseInt(rate.rows[0].count) >= 3)
             return res.status(429).json({ error: 'Too many requests' });
-        const user = await db_1.pool.query("INSERT INTO users (email,role,locale) VALUES ($1,'applicant',$2) ON CONFLICT (email) DO UPDATE SET locale=$2 RETURNING id,bank_id", [email, locale]);
+        const user = await db_1.pool.query("SELECT id,bank_id FROM users WHERE email=$1", [email]);
+        if (!user.rows.length)
+            return res.json({ success: true });
+        await db_1.pool.query("UPDATE users SET locale=$1 WHERE id=$2", [locale, user.rows[0].id]);
         const userId = user.rows[0].id;
         const bankId = user.rows[0].bank_id || null;
         const raw = (0, crypto_1.randomBytes)(32).toString('hex');
