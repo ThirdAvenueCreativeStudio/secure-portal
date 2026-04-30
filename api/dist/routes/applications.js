@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const db_1 = require("../lib/db");
+const checklist_1 = require("../lib/checklist");
 const router = (0, express_1.Router)();
 router.get('/me', async (req, res) => {
     const userId = req.cookies?.session || req.headers['x-user-id'];
@@ -12,7 +13,14 @@ router.get('/me', async (req, res) => {
         if (!app.rows.length)
             return res.json({ application: null, documents: [] });
         const docs = await db_1.pool.query('SELECT doc_type,status,rejection_reason FROM documents WHERE application_id=$1', [app.rows[0].id]);
-        return res.json({ application: app.rows[0], documents: docs.rows });
+        const bankId = app.rows[0].bank_id;
+        let checklist = checklist_1.DEFAULT_CHECKLIST;
+        if (bankId) {
+            const bc = await db_1.pool.query('SELECT doc_type,label_es,label_en,required FROM bank_checklists WHERE bank_id=$1 ORDER BY sort_order', [bankId]);
+            if (bc.rows.length)
+                checklist = bc.rows;
+        }
+        return res.json({ application: app.rows[0], documents: docs.rows, checklist });
     }
     catch (err) {
         console.error(err);

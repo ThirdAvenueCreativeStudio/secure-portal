@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../lib/db';
+import { DEFAULT_CHECKLIST } from '../lib/checklist';
 const router = Router();
 router.get('/me', async (req: Request, res: Response) => {
   const userId = req.cookies?.session || req.headers['x-user-id'] as string;
@@ -8,7 +9,10 @@ router.get('/me', async (req: Request, res: Response) => {
     const app = await pool.query('SELECT * FROM applications WHERE applicant_id=$1 ORDER BY created_at DESC LIMIT 1',[userId]);
     if (!app.rows.length) return res.json({ application:null, documents:[] });
     const docs = await pool.query('SELECT doc_type,status,rejection_reason FROM documents WHERE application_id=$1',[app.rows[0].id]);
-    return res.json({ application:app.rows[0], documents:docs.rows });
+    const bankId = app.rows[0].bank_id;
+    let checklist = DEFAULT_CHECKLIST;
+    if (bankId) { const bc = await pool.query('SELECT doc_type,label_es,label_en,required FROM bank_checklists WHERE bank_id=$1 ORDER BY sort_order',[bankId]); if (bc.rows.length) checklist = bc.rows; }
+    return res.json({ application:app.rows[0], documents:docs.rows, checklist });
   } catch(err){ console.error(err); return res.status(500).json({ error:'Failed' }); }
 });
 router.patch('/:id/status', async (req: Request, res: Response) => {
