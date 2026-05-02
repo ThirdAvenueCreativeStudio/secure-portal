@@ -13,6 +13,7 @@ export default function AdminPage() {
   const [banks, setBanks] = useState<any[]>([]);
   const [newBankName, setNewBankName] = useState("");
   const [newBankEmail, setNewBankEmail] = useState("");
+  const [newBankLocale, setNewBankLocale] = useState("es");
   const [bankAdminEmail, setBankAdminEmail] = useState("");
   const [bankAdminName, setBankAdminName] = useState("");
   const [selectedBankId, setSelectedBankId] = useState("");
@@ -67,7 +68,7 @@ export default function AdminPage() {
 
   async function createBank() {
     if (!newBankName||!user) return;
-    const r=await fetch(API+'/api/v1/admin/banks',{method:'POST',headers:{'Content-Type':'application/json','x-user-id':user.id},body:JSON.stringify({name:newBankName,contact_email:newBankEmail})});
+    const r=await fetch(API+'/api/v1/admin/banks',{method:'POST',headers:{'Content-Type':'application/json','x-user-id':user.id},body:JSON.stringify({name:newBankName,contact_email:newBankEmail,default_locale:newBankLocale})});
     const d=await r.json();
     if (d.bank) { setBankMsg('Banco creado: '+d.bank.name); setNewBankName(''); fetch(API+'/api/v1/admin/banks',{headers:{'x-user-id':user.id}}).then(r=>r.json()).then(d=>setBanks(d.banks||[])); }
     else setBankMsg('Error: '+(d.error||'unknown'));
@@ -190,6 +191,7 @@ export default function AdminPage() {
               <h3 style={{marginBottom:16}}>Crear Banco</h3>
               <div style={{marginBottom:12}}><label style={{display:"block",fontSize:13,fontWeight:600,marginBottom:4}}>Nombre *</label><input value={newBankName} onChange={e=>setNewBankName(e.target.value)} style={{width:"100%",padding:"10px",border:"1px solid #ddd",borderRadius:8}} /></div>
               <div style={{marginBottom:16}}><label style={{display:"block",fontSize:13,fontWeight:600,marginBottom:4}}>Email contacto</label><input value={newBankEmail} onChange={e=>setNewBankEmail(e.target.value)} style={{width:"100%",padding:"10px",border:"1px solid #ddd",borderRadius:8}} /></div>
+<div style={{marginBottom:16}}><label style={{display:"block",fontSize:13,fontWeight:600,marginBottom:4}}>Idioma por defecto</label><select value={newBankLocale} onChange={e=>setNewBankLocale(e.target.value)} style={{width:"100%",padding:"10px",border:"1px solid #ddd",borderRadius:8}}><option value="es">Espanol</option><option value="en">English</option></select></div>
 <button onClick={createBank} style={{width:"100%",padding:"10px",background:"#0F2340",color:"white",border:"none",borderRadius:8,fontWeight:600,cursor:"pointer"}}>Crear Banco</button></div>
             <div style={{background:"white",padding:24,borderRadius:12}}>
               <h3 style={{marginBottom:16}}>Invitar Bank Admin</h3>

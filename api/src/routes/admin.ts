@@ -134,10 +134,10 @@ export default router;
 // POST /admin/banks
 router.post('/banks', async (req: Request, res: Response) => {
   const userId=await requireAdmin(req,res); if (!userId) return;
-  const {name,subdomain,contact_email}=req.body;
+  const {name,subdomain,contact_email,default_locale}=req.body;
   if (!name) return res.status(400).json({error:'Name required'});
   try {
-    const b=await pool.query('INSERT INTO banks (name,subdomain,contact_email) VALUES ($1,$2,$3) RETURNING *',[name,subdomain||null,contact_email||null]);
+    const b=await pool.query('INSERT INTO banks (name,subdomain,contact_email,default_locale) VALUES ($1,$2,$3,$4) RETURNING *',[name,subdomain||null,contact_email||null,default_locale||'es']);
     return res.json({bank:b.rows[0]});
   } catch(e){ console.error(e); return res.status(500).json({error:'Failed'}); }
 });
@@ -158,7 +158,7 @@ router.post('/invite-bank-admin', async (req: Request, res: Response) => {
   if (!email||!bank_id) return res.status(400).json({error:'Email and bank required'});
   try {
     const ex=await pool.query('SELECT id FROM users WHERE email=$1',[email]);
-    if (!ex.rows.length) await pool.query("INSERT INTO users (email,full_name,role,bank_id,locale) VALUES ($1,$2,'bank_admin',$3,'es')",[email,full_name||'',bank_id]);
+    const bk=await pool.query('SELECT default_locale FROM banks WHERE id=$1',[bank_id]); const loc=bk.rows[0]?.default_locale||'es'; if (!ex.rows.length) await pool.query("INSERT INTO users (email,full_name,role,bank_id,locale) VALUES ($1,$2,'bank_admin',$3,$4)",[email,full_name||'',bank_id,loc]);
     else await pool.query("UPDATE users SET role='bank_admin',bank_id=$1 WHERE email=$2",[bank_id,email]);
     const u=await pool.query('SELECT id FROM users WHERE email=$1',[email]);
     const raw=randomBytes(32).toString('hex');

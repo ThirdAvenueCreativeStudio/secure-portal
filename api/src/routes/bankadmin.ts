@@ -42,7 +42,7 @@ router.post('/invite-officer', async (req: Request, res: Response) => {
   try {
     const ex = await pool.query('SELECT id FROM users WHERE email=$1',[email]);
     if (!ex.rows.length) {
-      await pool.query("INSERT INTO users (email,full_name,role,bank_id,locale) VALUES ($1,$2,'officer',$3,'es')",[email,full_name||'',auth.bankId]);
+      const bk=await pool.query("SELECT default_locale FROM banks WHERE id=$1",[auth.bankId]); const loc=bk.rows[0]?.default_locale||"es"; await pool.query("INSERT INTO users (email,full_name,role,bank_id,locale) VALUES ($1,$2,'officer',$3,$4)",[email,full_name||'',auth.bankId,loc]);
     } else {
       await pool.query("UPDATE users SET role='officer',bank_id=$1 WHERE email=$2",[auth.bankId,email]);
     }

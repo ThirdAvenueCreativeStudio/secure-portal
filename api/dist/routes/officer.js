@@ -168,7 +168,17 @@ router.post('/invite-applicant', async (req, res) => {
     const userId = await requireOfficer(req, res);
     if (!userId)
         return;
-    const { email, full_name, locale = 'es' } = req.body;
+    let { email, full_name, locale } = req.body;
+    if (!locale) {
+        const ub = await db_1.pool.query("SELECT bank_id FROM users WHERE id=$1", [userId]);
+        const bid = ub.rows[0]?.bank_id;
+        if (bid) {
+            const bk = await db_1.pool.query("SELECT default_locale FROM banks WHERE id=$1", [bid]);
+            locale = bk.rows[0]?.default_locale || "es";
+        }
+    }
+    if (!locale)
+        locale = "es";
     if (!email || !full_name)
         return res.status(400).json({ error: 'Email and name required' });
     try {
