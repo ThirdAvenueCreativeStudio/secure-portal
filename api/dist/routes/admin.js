@@ -25,17 +25,25 @@ router.get('/stats', async (req, res) => {
     if (!userId)
         return;
     try {
-        const [apps, docs, users, pending] = await Promise.all([
+        const [apps, docs, users, pending, bankStats, docsByStatus, totalBanks, totalOfficers] = await Promise.all([
             db_1.pool.query('SELECT COUNT(*) FROM applications'),
             db_1.pool.query('SELECT COUNT(*) FROM documents'),
             db_1.pool.query("SELECT COUNT(*) FROM users WHERE role='applicant'"),
             db_1.pool.query("SELECT COUNT(*) FROM documents WHERE status IN ('pending','uploaded')"),
+            db_1.pool.query("SELECT b.name,COUNT(a.id) as app_count FROM banks b LEFT JOIN applications a ON a.bank_id=b.id GROUP BY b.id,b.name ORDER BY app_count DESC"),
+            db_1.pool.query("SELECT status,COUNT(*) FROM documents GROUP BY status"),
+            db_1.pool.query("SELECT COUNT(*) FROM banks"),
+            db_1.pool.query("SELECT COUNT(*) FROM users WHERE role IN ('officer','bank_admin')"),
         ]);
         return res.json({
             applications: parseInt(apps.rows[0].count),
             documents: parseInt(docs.rows[0].count),
             applicants: parseInt(users.rows[0].count),
             pendingReview: parseInt(pending.rows[0].count),
+            banks: parseInt(totalBanks.rows[0].count),
+            officers: parseInt(totalOfficers.rows[0].count),
+            bankStats: bankStats.rows,
+            docsByStatus: docsByStatus.rows,
         });
     }
     catch (err) {
