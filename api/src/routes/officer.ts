@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../lib/db';
+import { DEFAULT_CHECKLIST } from '../lib/checklist';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { notifyApplicantDocApproved, notifyApplicantDocRejected, notifyApplicantIdleReminder } from '../lib/notify';
 import { sendApplicantWelcome } from '../lib/mailer';
@@ -52,7 +53,7 @@ router.get('/applications/:id', async (req, res) => {
     const app = await pool.query('SELECT a.*,u.email,u.full_name,u.phone FROM applications a JOIN users u ON u.id=a.applicant_id WHERE a.id=$1',[req.params.id]);
     if (!app.rows.length) return res.status(404).json({ error:'Not found' });
     const docs = await pool.query('SELECT * FROM documents WHERE application_id=$1 ORDER BY doc_type',[req.params.id]);
-    return res.json({ application:app.rows[0], documents:docs.rows });
+    const bankId=app.rows[0].bank_id; let checklist=DEFAULT_CHECKLIST; if(bankId){const bc=await pool.query("SELECT doc_type,label_es,label_en FROM bank_checklists WHERE bank_id=$1 ORDER BY sort_order",[bankId]);if(bc.rows.length)checklist=bc.rows;} return res.json({application:app.rows[0],documents:docs.rows,checklist});
   } catch(err){ console.error(err); return res.status(500).json({ error:'Failed' }); }
 });
 

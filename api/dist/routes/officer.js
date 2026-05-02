@@ -2,10 +2,11 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const db_1 = require("../lib/db");
+const checklist_1 = require("../lib/checklist");
 const client_s3_1 = require("@aws-sdk/client-s3");
 const notify_1 = require("../lib/notify");
 const mailer_1 = require("../lib/mailer");
-const checklist_1 = require("../lib/checklist");
+const checklist_2 = require("../lib/checklist");
 const crypto_1 = require("crypto");
 const router = (0, express_1.Router)();
 async function requireOfficer(req, res) {
@@ -62,7 +63,14 @@ router.get('/applications/:id', async (req, res) => {
         if (!app.rows.length)
             return res.status(404).json({ error: 'Not found' });
         const docs = await db_1.pool.query('SELECT * FROM documents WHERE application_id=$1 ORDER BY doc_type', [req.params.id]);
-        return res.json({ application: app.rows[0], documents: docs.rows });
+        const bankId = app.rows[0].bank_id;
+        let checklist = checklist_1.DEFAULT_CHECKLIST;
+        if (bankId) {
+            const bc = await db_1.pool.query("SELECT doc_type,label_es,label_en FROM bank_checklists WHERE bank_id=$1 ORDER BY sort_order", [bankId]);
+            if (bc.rows.length)
+                checklist = bc.rows;
+        }
+        return res.json({ application: app.rows[0], documents: docs.rows, checklist });
     }
     catch (err) {
         console.error(err);
@@ -213,7 +221,7 @@ router.post('/invite-applicant', async (req, res) => {
         // Get bank's custom checklist or fall back to default
         const officer2 = await db_1.pool.query('SELECT bank_id FROM users WHERE id=$1', [userId]);
         const bankId = officer2.rows[0]?.bank_id || null;
-        const docTypes = await (0, checklist_1.getBankChecklist)(db_1.pool, bankId);
+        const docTypes = await (0, checklist_2.getBankChecklist)(db_1.pool, bankId);
         for (const dt of docTypes)
             await db_1.pool.query('INSERT INTO documents (application_id,doc_type,status) VALUES ($1,$2,$3)', [appId, dt, 'pending']);
         const raw = (0, crypto_1.randomBytes)(32).toString('hex');
