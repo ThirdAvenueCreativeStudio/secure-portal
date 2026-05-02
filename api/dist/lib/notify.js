@@ -6,52 +6,50 @@ exports.notifyApplicantDocRejected = notifyApplicantDocRejected;
 exports.notifyApplicantIdleReminder = notifyApplicantIdleReminder;
 exports.notifyApplicantWelcome = notifyApplicantWelcome;
 const resend_1 = require("resend");
+const emailTemplate_1 = require("./emailTemplate");
 const resend = new resend_1.Resend(process.env.RESEND_API_KEY);
 const FROM = process.env.FROM_EMAIL || 'onboarding@resend.dev';
-const APP_URL = process.env.APP_URL || 'https://demo.docuhogar.com';
-function brand(body) {
-    return '<div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px"><div style="margin-bottom:24px"><span style="font-size:18px;font-weight:700;color:#0F2340">DocuHogar</span></div>' + body + '<div style="margin-top:32px;padding-top:16px;border-top:1px solid #eee;font-size:12px;color:#999">DocuHogar &mdash; Portal Seguro</div></div>';
-}
-async function notifyOfficerDocUploaded(opts) {
-    const label = opts.docType.replace(/_/g, ' ');
-    await resend.emails.send({ from: FROM, to: opts.officerEmail,
-        subject: 'New document uploaded — ' + opts.applicantName,
-        html: brand('<h2 style="color:#0F2340">New Document Ready for Review</h2><p><strong>' + opts.applicantName + '</strong> uploaded a <strong>' + label + '</strong>.</p><a href="' + APP_URL + '/officer" style="display:inline-block;margin-top:16px;padding:12px 24px;background:#0F2340;color:white;border-radius:8px;text-decoration:none">Review Documents &rarr;</a>'),
-    });
+async function notifyOfficerDocUploaded(o) {
+    const label = o.docType.replace(/_/g, " ");
+    const c = (0, emailTemplate_1.emailHeading)("Nuevo Documento") + (0, emailTemplate_1.emailText)("<strong>" + o.applicantName + "</strong> subio: <strong>" + label + "</strong>")
+        + (0, emailTemplate_1.emailButton)(emailTemplate_1.APP + "/officer", "Revisar documentos");
+    await resend.emails.send({ from: FROM, to: o.officerEmail, subject: "Nuevo documento: " + o.applicantName, html: (0, emailTemplate_1.emailLayout)(c) });
 }
 async function notifyApplicantDocApproved(o) {
-    const es = o.locale !== 'en';
-    const label = o.docType.replace(/_/g, ' ');
-    const subj = es ? 'Documento aprobado: ' + label : 'Document approved: ' + label;
-    const msg = es ? 'Su documento ' + label + ' ha sido aprobado.' : 'Your ' + label + ' has been approved.';
-    const cta = es ? 'Ver mi solicitud' : 'View my application';
-    await resend.emails.send({ from: FROM, to: o.applicantEmail, subject: subj,
-        html: brand('<h2 style="color:#1a7a4a">' + (es ? 'Aprobado' : 'Approved') + ' ✓</h2><p>Hola ' + o.applicantName + ', ' + msg + '</p><a href="' + APP_URL + '/dashboard" style="display:inline-block;padding:12px 24px;background:#0F2340;color:white;border-radius:8px;text-decoration:none">' + cta + '</a>'),
-    });
+    const es = o.locale !== "en";
+    const label = o.docType.replace(/_/g, " ");
+    const c = (0, emailTemplate_1.emailHeading)(es ? "Documento Aprobado" : "Document Approved", emailTemplate_1.GREEN)
+        + (0, emailTemplate_1.emailBadge)(es ? "Aprobado" : "Approved", "#EAF5EE", emailTemplate_1.GREEN)
+        + (0, emailTemplate_1.emailText)("<br><br>" + (es ? "Hola " + o.applicantName + ", su documento <strong>" + label + "</strong> ha sido aprobado." : "Hi " + o.applicantName + ", your <strong>" + label + "</strong> has been approved."))
+        + (0, emailTemplate_1.emailButton)(emailTemplate_1.APP + "/dashboard", es ? "Ver mi solicitud" : "View my application", emailTemplate_1.GREEN);
+    await resend.emails.send({ from: FROM, to: o.applicantEmail, subject: (es ? "Aprobado: " : "Approved: ") + label, html: (0, emailTemplate_1.emailLayout)(c) });
 }
 async function notifyApplicantDocRejected(o) {
-    const es = o.locale !== 'en';
-    const label = o.docType.replace(/_/g, ' ');
-    const subj = es ? 'Documento rechazado: ' + label : 'Document rejected: ' + label;
-    const cta = es ? 'Subir nuevamente' : 'Re-upload';
-    const body = '<h2 style="color:#c0392b">' + (es ? 'Accion Requerida' : 'Action Required') + '</h2><p>' + o.applicantName + ': ' + label + ' ' + (es ? 'rechazado' : 'rejected') + '.</p><p><strong>' + (es ? 'Motivo' : 'Reason') + ':</strong> ' + (o.reason || '--') + '</p><a href="' + APP_URL + '/dashboard" style="display:inline-block;padding:12px 24px;background:#0F2340;color:white;border-radius:8px;text-decoration:none">' + cta + '</a>';
-    await resend.emails.send({ from: FROM, to: o.applicantEmail, subject: subj, html: brand(body) });
+    const es = o.locale !== "en";
+    const label = o.docType.replace(/_/g, " ");
+    const c = (0, emailTemplate_1.emailHeading)(es ? "Accion Requerida" : "Action Required", emailTemplate_1.RED)
+        + (0, emailTemplate_1.emailBadge)(es ? "Rechazado" : "Rejected", "#FDECEC", emailTemplate_1.RED)
+        + (0, emailTemplate_1.emailText)("<br><br>" + o.applicantName + ": <strong>" + label + "</strong> " + (es ? "rechazado." : "rejected."))
+        + (0, emailTemplate_1.emailText)("<strong>" + (es ? "Motivo" : "Reason") + ":</strong> " + (o.reason || "--"))
+        + (0, emailTemplate_1.emailButton)(emailTemplate_1.APP + "/dashboard", es ? "Subir nuevamente" : "Re-upload", emailTemplate_1.RED);
+    await resend.emails.send({ from: FROM, to: o.applicantEmail, subject: (es ? "Rechazado: " : "Rejected: ") + label, html: (0, emailTemplate_1.emailLayout)(c) });
 }
 async function notifyApplicantIdleReminder(o) {
-    const es = o.locale !== 'en';
-    const subj = es ? 'Recordatorio: documentos pendientes' : 'Reminder: pending documents';
-    const items = o.pendingDocs.map(d => '<li>' + d.replace(/_/g, ' ') + '</li>').join('');
-    const body = '<h2>' + (es ? 'Documentos Pendientes' : 'Pending Documents') + '</h2><p>' + o.applicantName + (es ? ': documentos pendientes:' : ': pending docs:') + '</p><ul>' + items + '</ul><a href="' + APP_URL + '/dashboard" style="padding:12px 24px;background:#0F2340;color:white;border-radius:8px;text-decoration:none">' + (es ? 'Completar' : 'Complete') + '</a>';
-    await resend.emails.send({ from: FROM, to: o.applicantEmail, subject: subj, html: brand(body) });
+    const es = o.locale !== "en";
+    const items = o.pendingDocs.map(d => "&bull; " + d.replace(/_/g, " ")).join("<br>");
+    const c = (0, emailTemplate_1.emailHeading)(es ? "Documentos Pendientes" : "Pending Documents", emailTemplate_1.NAVY)
+        + (0, emailTemplate_1.emailText)(o.applicantName + (es ? ", tiene documentos pendientes:" : ", you have pending documents:"))
+        + (0, emailTemplate_1.emailText)(items)
+        + (0, emailTemplate_1.emailButton)(emailTemplate_1.APP + "/dashboard", es ? "Completar ahora" : "Complete now");
+    await resend.emails.send({ from: FROM, to: o.applicantEmail, subject: es ? "Recordatorio: documentos pendientes" : "Reminder: pending documents", html: (0, emailTemplate_1.emailLayout)(c) });
 }
 async function notifyApplicantWelcome(o) {
-    const es = o.locale !== 'en';
-    const url = process.env.APP_URL + '/auth/verify?t=' + o.token;
-    const subject = es ? 'Su expediente hipotecario — Acceso seguro' : 'Your mortgage file — Secure access';
-    const msg = es ? 'Hola <strong>' + o.applicantName + '</strong>, su oficial ha iniciado su expediente. Acceda al portal para cargar sus documentos.' : 'Hi <strong>' + o.applicantName + '</strong>, your loan officer has started your mortgage file. Please upload your documents.';
-    const cta = es ? 'Acceder a mi expediente' : 'Access my file';
-    const expire = es ? 'Este enlace expira en 15 minutos.' : 'This link expires in 15 minutes.';
-    await resend.emails.send({ from: FROM, to: o.applicantEmail, subject,
-        html: brand('<h2 style="color:#0F2340">' + (es ? 'Bienvenido' : 'Welcome') + '</h2><p>' + msg + '</p><a href="' + url + '" style="display:inline-block;margin-top:16px;padding:14px 28px;background:#0F2340;color:white;border-radius:8px;text-decoration:none;font-weight:600">' + cta + ' &rarr;</a><p style="margin-top:16px;font-size:13px;color:#999">' + expire + '</p>'),
-    });
+    const es = o.locale !== "en";
+    const url = emailTemplate_1.APP + "/auth/verify?t=" + o.token;
+    const intro = es ? "su oficial ha iniciado su expediente. Acceda para cargar documentos." : "your officer started your file. Upload documents securely.";
+    const c = (0, emailTemplate_1.emailHeading)(es ? "Bienvenido" : "Welcome")
+        + (0, emailTemplate_1.emailText)((es ? "Hola " : "Hi ") + o.applicantName + ", " + intro)
+        + (0, emailTemplate_1.emailButton)(url, es ? "Acceder a mi expediente" : "Access my file")
+        + (0, emailTemplate_1.emailNote)(es ? "Enlace expira en 15 min." : "Link expires in 15 min.");
+    await resend.emails.send({ from: FROM, to: o.applicantEmail, subject: es ? "Su expediente hipotecario" : "Your mortgage file", html: (0, emailTemplate_1.emailLayout)(c) });
 }
