@@ -98,7 +98,7 @@ export default function Dashboard() {
   if(!user)return(<main style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#FAF8F3"}}><p>Cargando...</p></main>);
 
   return(<main style={{minHeight:"100vh",background:"#FAF8F3",fontFamily:"sans-serif"}}>
-    <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" capture="environment" style={{display:"none"}} onChange={onFileChange}/>
+    <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{display:"none"}} onChange={onFileChange}/>
 
     {preview&&activeDoc&&(
       <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>{setPreview(null);setActiveDoc(null);}}>
