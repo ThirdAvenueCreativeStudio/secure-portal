@@ -81,7 +81,7 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
       }
     } catch(ne){ console.error('notify error',ne); }
     return res.json({ success: true, doc_type, status: 'uploaded' });
-  } catch(err:any) { console.error('UPLOAD ERR:',err); return res.status(500).json({ error: 'Upload failed', detail: err?.message }); }
+  } catch(err:any) { console.error('UPLOAD ERR:',err?.message); return res.status(500).json({ error: 'Upload failed' }); }
 });
 
 router.get('/:id/view', async (req: Request, res: Response) => {

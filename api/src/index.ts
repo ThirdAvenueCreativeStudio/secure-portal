@@ -1,6 +1,7 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
+import helmet from 'helmet';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import documentRoutes from './routes/documents';
@@ -37,23 +38,34 @@ const uploadLimiter = rateLimit({
   message: { error: 'Too many uploads, please try again later.' },
 });
 
+// Auth rate limit — 5 per 15 min per IP
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: 'Too many requests, please try again later.' },
+});
+
 // Officer doc view limit — 60 per hour per IP (prevents bulk exfiltration)
 const viewLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 60,
   message: { error: 'Too many document views, please try again later.' },
 });
-app.use(cors({ origin: true, credentials: true }));
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || 'https://demo.docuhogar.com,https://docuhogar.com,https://www.docuhogar.com').split(',');
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(cors({ origin: (origin, cb) => { if (!origin || ALLOWED_ORIGINS.includes(origin)) cb(null, true); else cb(new Error('CORS')); }, credentials: true }));
 app.use(globalLimiter);
 app.use(express.json());
 app.use(cookieParser());
-app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/auth', authLimiter, authRoutes);
 app.use('/api/v1/documents/upload', uploadLimiter);
 app.use('/api/v1/officer/documents', viewLimiter);
 app.use('/api/v1/documents', documentRoutes);
 app.use('/api/v1/applications', applicationRoutes);
 app.use('/api/v1/officer', officerRoutes);
 app.use('/api/v1/admin', adminRoutes);
+const exportLimiter = rateLimit({ windowMs: 60*60*1000, max: 5, message: { error: 'Export limit reached, try again later.' } });
+app.use('/api/v1/bank-admin/audit-log/export', exportLimiter);
 app.use('/api/v1/bank-admin', bankAdminRoutes);
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
 app.use(notFound);
