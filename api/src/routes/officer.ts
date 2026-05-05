@@ -73,9 +73,36 @@ router.patch('/documents/:id', async (req, res) => {
         else await notifyApplicantDocRejected({applicantEmail:email,applicantName:full_name,docType:doc_type,reason:rejection_reason||'',locale});
       }
     } catch(ne){ console.error('notify err',ne); }
+    // 90% billing threshold check
+    if (status === 'approved') {
+      try {
+        const appRes = await pool.query('SELECT application_id FROM documents WHERE id=$1', [req.params.id]);
+        const appId = appRes.rows[0]?.application_id;
+        if (appId) {
+          const billableCheck = await pool.query('SELECT billable_at FROM applications WHERE id=$1', [appId]);
+          if (!billableCheck.rows[0]?.billable_at) {
+            const counts = await pool.query(
+              "SELECT COUNT(*) as total, COUNT(CASE WHEN status='approved' THEN 1 END) as approved FROM documents WHERE application_id=$1",
+              [appId]
+            );
+            const total = parseInt(counts.rows[0].total);
+            const approved = parseInt(counts.rows[0].approved);
+            if (total > 0 && approved / total >= 0.9) {
+              await pool.query('UPDATE applications SET billable_at=NOW() WHERE id=$1', [appId]);
+              await pool.query(
+                'INSERT INTO audit_log (actor_id,action,entity_type,entity_id,metadata) VALUES ($1,$2,$3,$4,$5)',
+                [userId, 'billing.threshold_reached', 'application', appId, JSON.stringify({approved, total, pct: Math.round(approved/total*100)})]
+              );
+              console.log(`Billing threshold reached for application ${appId}: ${approved}/${total} docs approved`);
+            }
+          }
+        }
+      } catch(be){ console.error('billing threshold err',be); }
+    }
     return res.json({ success:true });
   } catch(err){ console.error(err); return res.status(500).json({ error:'Failed' }); }
 });
+
 
 router.get('/documents/:id/view', async (req, res) => {
   const userId = await requireOfficer(req, res);

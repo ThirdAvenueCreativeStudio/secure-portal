@@ -19,7 +19,7 @@ export async function getBillingData(year:number, month:number): Promise<BankRep
   const banks = await pool.query('SELECT id,name,contact_email FROM banks WHERE active=true');
   const reports: BankReport[] = [];
   for (const bank of banks.rows) {
-    const c1=await pool.query("SELECT COUNT(DISTINCT a.id) as n FROM applications a JOIN users u ON u.id=a.applicant_id WHERE u.bank_id=$1 AND a.status='submitted' AND a.updated_at>=$2 AND a.updated_at<$3",[bank.id,start,end]);
+    const c1=await pool.query("SELECT COUNT(DISTINCT a.id) as n FROM applications a JOIN users u ON u.id=a.applicant_id WHERE u.bank_id=$1 AND a.billable_at IS NOT NULL AND a.billable_at>=$2 AND a.billable_at<$3",[bank.id,start,end]);
     const c2=await pool.query("SELECT COUNT(DISTINCT a.id) as n FROM applications a JOIN users u ON u.id=a.applicant_id WHERE u.bank_id=$1 AND a.status='in_progress'",[bank.id]);
     const c3=await pool.query("SELECT COUNT(DISTINCT a.id) as n FROM applications a JOIN users u ON u.id=a.applicant_id WHERE u.bank_id=$1 AND a.status='in_progress' AND a.updated_at<NOW()-INTERVAL '30 days'",[bank.id]);
     const comp=parseInt(c1.rows[0].n);
@@ -119,7 +119,7 @@ export async function sendMonthlyBillingReport(year:number, month:number) {
     if (!r.contactEmail||r.completed===0) continue;
     const num=year+'-'+String(month).padStart(2,'0')+'-'+String(i+1).padStart(3,'0');
     // Fetch individual applications for this bank this month
-    const appRows=await pool.query("SELECT a.id,u.full_name,u.email,a.updated_at FROM applications a JOIN users u ON u.id=a.applicant_id WHERE u.bank_id=$1 AND a.status='submitted' AND a.updated_at>=$2 AND a.updated_at<$3 ORDER BY a.updated_at",[r.bankId,new Date(year,month-1,1),new Date(year,month,1)]);
+    const appRows=await pool.query("SELECT a.id,u.full_name,u.email,a.updated_at FROM applications a JOIN users u ON u.id=a.applicant_id WHERE u.bank_id=$1 AND a.billable_at IS NOT NULL AND a.billable_at>=$2 AND a.billable_at<$3 ORDER BY a.updated_at",[r.bankId,new Date(year,month-1,1),new Date(year,month,1)]);
     const pdf=await generateInvoicePDF(r,monthName,num,appRows.rows);
     const body='<p>Estimado equipo de '+r.bankName+',</p><p>Adjunto la factura para '+monthName+'. Total: $'+r.total.toFixed(2)+'</p><p>Pago via ACH wire transfer en 30 dias.</p><p>DocuHogar — info@docuhogar.com</p>';
     await resend.emails.send({from:FROM,to:r.contactEmail,subject:'DocuHogar Factura '+monthName,html:body,attachments:[{filename:'Factura-'+num+'.pdf',content:pdf}]});
