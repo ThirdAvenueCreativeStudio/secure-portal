@@ -26,7 +26,7 @@ router.get('/applications', async (req: Request, res: Response) => {
     const bankId = officer.rows[0]?.bank_id;
     const isGlobalAdmin = officer.rows[0]?.role === 'admin';
     const hasBank = !isGlobalAdmin && bankId;
-    const bankFilter = hasBank ? "AND u.bank_id=$1" : '';
+    const bankFilter = hasBank ? "AND a.bank_id=$1" : '';
     const params:any[] = hasBank ? [bankId] : [];
     const apps = await pool.query(`
       SELECT a.id, a.status, a.created_at, a.updated_at,
