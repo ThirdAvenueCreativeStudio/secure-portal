@@ -167,7 +167,7 @@ router.post('/invite-applicant', async (req, res) => {
     const officerBankId = officerBank.rows[0]?.bank_id||null;
     const app = await pool.query("INSERT INTO applications (applicant_id,assigned_to,bank_id,status) VALUES ($1,$2,$3,'in_progress') RETURNING id",[applicantId,userId,officerBankId]);
     const appId = app.rows[0].id;
-    const docTypes = ['passport', 'us_address_proof', 'pay_stub', 'bank_statement', 'credit_auth', 'promesa_venta', 'nit', 'remittance_history'];
+    const docTypes = await getBankChecklist(pool,officerBankId);
     for (const dt of docTypes) {
       await pool.query('INSERT INTO documents (application_id,doc_type,status) VALUES ($1,$2,$3)',[appId,dt,'pending']);
     }
@@ -181,7 +181,6 @@ router.post('/invite-applicant', async (req, res) => {
   } catch(err){ console.error(err); return res.status(500).json({ error:'Failed' }); }
 });
 
-const DOC_TYPES=['passport','us_address_proof','pay_stub','bank_statement','credit_auth','promesa_venta','nit','remittance_history'];
 
 // POST /officer/invite-applicant
 router.post('/invite-applicant', async (req, res) => {
