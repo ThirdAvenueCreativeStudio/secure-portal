@@ -49,3 +49,20 @@ export async function notifyApplicantWelcome(o:{applicantEmail:string;applicantN
     +emailNote(es?"Enlace expira en 15 min.":"Link expires in 15 min.");
   await resend.emails.send({from:FROM,to:o.applicantEmail,subject:es?"Su expediente hipotecario":"Your mortgage file",html:emailLayout(c)});
 }
+
+export async function notifyOfficerApplicationSubmitted(o:{officerEmail:string;applicantName:string;applicantEmail:string;appId:string}) {
+  const c=emailHeading("Solicitud Enviada",NAVY)
+    +emailBadge("Enviada","#EBF0FA","#185FA5")
+    +emailText("<br><br><strong>"+o.applicantName+"</strong> ("+o.applicantEmail+") ha enviado su solicitud.")
+    +emailButton(APP+"/officer","Revisar solicitud");
+  await resend.emails.send({from:FROM,to:o.officerEmail,subject:"Nueva solicitud: "+o.applicantName,html:emailLayout(c)});
+}
+
+export async function notifyApplicantApplicationSubmitted(o:{applicantEmail:string;applicantName:string;locale?:string}) {
+  const es=o.locale!=="en";
+  const c=emailHeading(es?"Solicitud Enviada":"Application Submitted","#1D7A4E")
+    +emailBadge(es?"Enviada":"Submitted","#EAF5EE","#1D7A4E")
+    +emailText("<br><br>"+(es?"Hola "+o.applicantName+", tu solicitud fue enviada. El oficial revisara tus documentos y te notificaremos.":"Hi "+o.applicantName+", your application was submitted. The officer will review your documents and we will notify you."))
+    +emailButton(APP+"/dashboard",es?"Ver mi solicitud":"View my application","#1D7A4E");
+  await resend.emails.send({from:FROM,to:o.applicantEmail,subject:es?"Solicitud enviada":"Application submitted",html:emailLayout(c)});
+}
