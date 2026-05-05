@@ -163,7 +163,9 @@ router.post('/invite-applicant', async (req, res) => {
       const nu = await pool.query("INSERT INTO users (email,full_name,role,locale) VALUES ($1,$2,'applicant',$3) RETURNING id",[email,full_name,locale]);
       applicantId = nu.rows[0].id;
     }
-    const app = await pool.query("INSERT INTO applications (applicant_id,assigned_to,status) VALUES ($1,$2,'in_progress') RETURNING id",[applicantId,userId]);
+    const officerBank = await pool.query("SELECT bank_id FROM users WHERE id=$1",[userId]);
+    const officerBankId = officerBank.rows[0]?.bank_id||null;
+    const app = await pool.query("INSERT INTO applications (applicant_id,assigned_to,bank_id,status) VALUES ($1,$2,$3,'in_progress') RETURNING id",[applicantId,userId,officerBankId]);
     const appId = app.rows[0].id;
     const docTypes = ['passport', 'us_address_proof', 'pay_stub', 'bank_statement', 'credit_auth', 'promesa_venta', 'nit', 'remittance_history'];
     for (const dt of docTypes) {
@@ -194,11 +196,11 @@ router.post('/invite-applicant', async (req, res) => {
       uRes=await pool.query('SELECT id FROM users WHERE email=$1',[email]);
     }
     const applicantId=uRes.rows[0].id;
-    const appRes=await pool.query('INSERT INTO applications (applicant_id,status) VALUES ($1,$2) RETURNING id',[applicantId,'in_progress']);
-    const appId=appRes.rows[0].id;
-    // Get bank's custom checklist or fall back to default
     const officer2=await pool.query('SELECT bank_id FROM users WHERE id=$1',[userId]);
     const bankId=officer2.rows[0]?.bank_id||null;
+    const appRes=await pool.query('INSERT INTO applications (applicant_id,assigned_to,bank_id,status) VALUES ($1,$2,$3,$4) RETURNING id',[applicantId,userId,bankId,'in_progress']);
+    const appId=appRes.rows[0].id;
+    // Get bank custom checklist or fall back to default
     const docTypes=await getBankChecklist(pool,bankId);
     for (const dt of docTypes) await pool.query('INSERT INTO documents (application_id,doc_type,status) VALUES ($1,$2,$3)',[appId,dt,'pending']);
     const raw=randomBytes(32).toString('hex');
