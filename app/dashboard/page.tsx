@@ -42,8 +42,10 @@ export default function Dashboard() {
   }, []);
   const required = checklist.filter(d => d.required);
   const approved = required.filter(d => docStatus[d.doc_type]?.status === "approved").length;
+  const uploaded = required.filter(d => ["approved","uploaded"].includes(docStatus[d.doc_type]?.status||"")).length;
   const total = required.length;
   const pct = total > 0 ? Math.round((approved / total) * 100) : 0;
+  const canSubmit = total > 0 && uploaded === total;
 
   async function handleUpload(docKey: string, file: File) {
     setUploading(docKey); setUploadProgress(0);
@@ -75,7 +77,7 @@ export default function Dashboard() {
   function logout() { localStorage.removeItem("user"); fetch(API+"/api/v1/auth/logout",{method:"POST",credentials:"include"}); router.push("/"); }
 
   async function submitApplication() {
-    if (!appId || pct < 100) return;
+    if (!appId || !canSubmit) return;
     try { await fetch(API+"/api/v1/applications/"+appId+"/status",{ method:"PATCH",credentials:"include",headers:{"Content-Type":"application/json","x-user-id":user?.id||""},body:JSON.stringify({status:"submitted"}) });
       alert(locale==="es"?"Solicitud enviada":"Application submitted");
     } catch { alert("Error"); }
@@ -185,7 +187,7 @@ export default function Dashboard() {
         );
       })}
 
-      <button onClick={submitApplication} disabled={pct<100} style={{width:"100%",padding:14,background:pct===100?GOLD:"#F3F4F6",color:pct===100?NAVY:"#9CA3AF",border:"none",borderRadius:10,fontSize:14,fontWeight:600,marginTop:20,cursor:pct===100?"pointer":"not-allowed"}}>
+      <button onClick={submitApplication} disabled={!canSubmit} style={{width:"100%",padding:14,background:canSubmit?GOLD:"#F3F4F6",color:canSubmit?NAVY:"#9CA3AF",border:"none",borderRadius:10,fontSize:14,fontWeight:600,marginTop:20,cursor:canSubmit?"pointer":"not-allowed"}}>
         {locale==="es"?"Enviar solicitud al banco":"Submit application to bank"}
       </button>
       <p style={{fontSize:11,color:"#C0C0C0",textAlign:"center",marginTop:12}}>{locale==="es"?"PDF, JPG, PNG — maximo 20MB":"PDF, JPG, PNG — max 20MB"}</p>
